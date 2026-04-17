@@ -2,12 +2,12 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>ISO‑Passungs‑ & Allgemeintoleranzrechner</title>
+<title>ISO‑286 & ISO‑2768 Toleranzrechner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 body{
-  font-family:Arial,system-ui;
+  font-family: Arial, system-ui;
   background:#f3f4f6;
   padding:20px;
 }
@@ -27,7 +27,7 @@ small{color:#666}
 input,select,button{
   width:100%;
   padding:8px;
-  margin:6px 0 14px;
+  margin:6px 0 12px;
 }
 
 button{
@@ -59,7 +59,7 @@ button:hover{background:#1d4ed8}
 /* ================= GRAFIK ================= */
 
 .graph-wrapper{
-  margin-top:25px;
+  margin-top:20px;
 }
 
 .graph{
@@ -67,11 +67,11 @@ button:hover{background:#1d4ed8}
   height:70px;
   background:#e5e7eb;
   border-radius:35px;
-  padding: 0 80px;           /* <<< WICHTIG: Label‑Zone */
+  padding:0 90px;               /* Platz für Labels */
   overflow:visible;
 }
 
-/* 0‑Linie */
+/* Nennmaß-Linie */
 .zero-line{
   position:absolute;
   left:50%;
@@ -92,12 +92,12 @@ button:hover{background:#1d4ed8}
 }
 
 .bore{ background:#2563eb; }
-.shaft{ background:#dc2626; top:calc(50% + 16px); }
+.shaft{ background:#dc2626; top:calc(50% + 18px); }
 
 /* Labels */
 .bar-label{
   position:absolute;
-  top:-22px;
+  top:-24px;
   font-size:12px;
   color:#111;
   white-space:nowrap;
@@ -111,7 +111,7 @@ button:hover{background:#1d4ed8}
   justify-content:space-between;
   font-size:12px;
   color:#444;
-  padding:0 80px;
+  padding:0 90px;
   margin-top:6px;
 }
 
@@ -119,40 +119,48 @@ button:hover{background:#1d4ed8}
   margin-top:8px;
   font-size:13px;
 }
-.legend span{margin-right:16px}
+.legend span{margin-right:18px}
 </style>
 </head>
 
 <body>
 
+<!-- ================================================= -->
+<!-- ISO 286 PASSUNG -->
+<!-- ================================================= -->
 <div class="card">
 <h1>ISO‑Passungsrechner (ISO 286)</h1>
-<small>Tabellenbasierte Berechnung · normnah</small>
+<small>Tabellenbasierte Berechnung • normnah</small>
 
 <div class="grid">
-  <input id="d" type="number" value="20" placeholder="Nennmaß [mm]">
-  <select id="hole">
+  <input id="nenn" type="number" value="20" placeholder="Nennmaß [mm]">
+
+  <select id="bohrung">
     <option value="H">Bohrung H</option>
     <option value="G">Bohrung G</option>
     <option value="F">Bohrung F</option>
     <option value="JS">Bohrung JS</option>
     <option value="K">Bohrung K</option>
   </select>
-  <select id="shaft">
+
+  <select id="welle">
     <option value="h">Welle h</option>
     <option value="g">Welle g</option>
     <option value="f">Welle f</option>
     <option value="js">Welle js</option>
     <option value="k">Welle k</option>
   </select>
+
   <select id="it">
-    <option>6</option><option selected>7</option><option>8</option>
+    <option value="6">IT6</option>
+    <option value="7" selected>IT7</option>
+    <option value="8">IT8</option>
   </select>
 </div>
 
-<button onclick="calcISO()">Passung berechnen</button>
+<button onclick="calcPassung()">Passung berechnen</button>
 
-<div id="out" class="result"></div>
+<div id="outPassung" class="result"></div>
 
 <div class="graph-wrapper">
   <div class="graph" id="graph">
@@ -179,17 +187,46 @@ button:hover{background:#1d4ed8}
 </div>
 </div>
 
+<!-- ================================================= -->
+<!-- ISO 2768 ALLGEMEINTOLERANZ -->
+<!-- ================================================= -->
+<div class="card">
+<h2>Allgemeintoleranz‑Rechner (ISO 2768)</h2>
+<small>ISO 2768‑1 • Längenmaße</small>
+
+<div class="grid">
+  <input id="genNenn" type="number" placeholder="Nennmaß [mm]">
+  <select id="genKlasse">
+    <option value="f">fein (f)</option>
+    <option value="m" selected>mittel (m)</option>
+    <option value="c">grob (c)</option>
+    <option value="v">sehr grob (v)</option>
+  </select>
+</div>
+
+<button onclick="calcISO2768()">Toleranz berechnen</button>
+<div id="out2768" class="result"></div>
+</div>
+
 <script>
+/* ================= ISO 286 Daten ================= */
+
 const ranges=[3,6,10,18,30,50,80,120];
-const IT={7:[10,12,15,18,21,25,30,35]};
-const holeDev={
+const IT_VALUES={
+  6:[6,8,9,11,13,16,19,22],
+  7:[10,12,15,18,21,25,30,35],
+  8:[14,18,22,27,33,39,46,54]
+};
+
+const HOLE_DEV={
   H:[0,0,0,0,0,0,0,0],
   G:[2,3,4,6,8,10,12,15],
   F:[6,8,10,13,16,19,22,25],
   JS:[-5,-7,-9,-11,-13,-15,-18,-21],
   K:[-2,-3,-4,-5,-6,-8,-10,-12]
 };
-const shaftDev={
+
+const SHAFT_DEV={
   h:[0,0,0,0,0,0,0,0],
   g:[-2,-3,-4,-5,-6,-7,-9,-10],
   f:[-6,-7,-9,-11,-13,-16,-19,-22],
@@ -197,42 +234,88 @@ const shaftDev={
   k:[2,3,4,5,6,7,9,10]
 };
 
-function ri(d){ return ranges.findIndex(r=>d<=r); }
+function rangeIndex(d){
+  return ranges.findIndex(r=>d<=r);
+}
 
-function calcISO(){
-  const d0=Number(d.value);
-  const r=ri(d0);
-  const T=IT7[r]/1000;
-  const EB=holeDev[hole.value][r]/1000;
-  const ES=shaftDev[shaft.value][r]/1000;
+function calcPassung(){
+  const d0=Number(nenn.value);
+  const r=rangeIndex(d0);
+  if(r<0) return;
+
+  const itg=it.value;
+  const T=IT_VALUES[itg][r]/1000;
+  const EB=HOLE_DEV[bohrung.value][r]/1000;
+  const ES=SHAFT_DEV[welle.value][r]/1000;
 
   const boreMin=d0+EB, boreMax=boreMin+T;
   const shaftMax=d0+ES, shaftMin=shaftMax-T;
+
+  const min=boreMin-shaftMax;
+  const max=boreMax-shaftMin;
+
+  let type="<span class='mid'>Übergangspassung</span>";
+  if(min>0) type="<span class='good'>Spielpassung</span>";
+  if(max<0) type="<span class='bad'>Übermaß‑ / Presspassung</span>";
+
+  outPassung.innerHTML=`
+<b>Bohrung:</b> ${boreMin.toFixed(4)} … ${boreMax.toFixed(4)} mm<br>
+<b>Welle:</b> ${shaftMin.toFixed(4)} … ${shaftMax.toFixed(4)} mm<br><br>
+<b>Spiel / Übermaß:</b><br>
+min: ${min.toFixed(4)} mm<br>
+max: ${max.toFixed(4)} mm<br><br>
+<b>Passungsart:</b> ${type}
+`;
 
   const refMin=Math.min(boreMin,shaftMin);
   const refMax=Math.max(boreMax,shaftMax);
   const span=refMax-refMin;
 
-  const graphWidth = document.getElementById("graph").clientWidth - 160;
-  const scale = graphWidth/span;
+  const graphWidth=document.getElementById("graph").clientWidth-180;
+  const scale=graphWidth/span;
 
-  const boreLeft=(boreMin-refMin)*scale + 80;
-  const shaftLeft=(shaftMin-refMin)*scale + 80;
+  const boreLeft=(boreMin-refMin)*scale+90;
+  const shaftLeft=(shaftMin-refMin)*scale+90;
 
   boreBar.style.left=boreLeft+"px";
-  boreBar.style.width=(T*scale)+"px";
-
+  boreBar.style.width=T*scale+"px";
   shaftBar.style.left=shaftLeft+"px";
-  shaftBar.style.width=(T*scale)+"px";
+  shaftBar.style.width=T*scale+"px";
 
-  boreLabel.style.left=(boreLeft + T*scale/2)+"px";
-  shaftLabel.style.left=(shaftLeft + T*scale/2)+"px";
+  boreLabel.style.left=(boreLeft+T*scale/2)+"px";
+  shaftLabel.style.left=(shaftLeft+T*scale/2)+"px";
 
-  boreLabel.innerText=`Bohrung ${hole.value}7: ${(EB*1000).toFixed(0)} / ${((EB+T)*1000).toFixed(0)} µm`;
-  shaftLabel.innerText=`Welle ${shaft.value}7: ${((ES-T)*1000).toFixed(0)} / ${(ES*1000).toFixed(0)} µm`;
+  boreLabel.textContent=`Bohrung ${bohrung.value}${itg}: ${(EB*1000).toFixed(0)} / ${((EB+T)*1000).toFixed(0)} µm`;
+  shaftLabel.textContent=`Welle ${welle.value}${itg}: ${((ES-T)*1000).toFixed(0)} / ${(ES*1000).toFixed(0)} µm`;
+}
+
+/* ================= ISO 2768 ================= */
+
+function calcISO2768(){
+  const d0=Math.abs(Number(genNenn.value));
+  const k=genKlasse.value;
+  if(!d0) return;
+
+  const table={
+    f:[[6,0.05],[30,0.1],[120,0.15],[400,0.2],[1000,0.3],[1e9,0.5]],
+    m:[[6,0.1],[30,0.2],[120,0.3],[400,0.5],[1000,0.8],[1e9,1.2]],
+    c:[[6,0.2],[30,0.5],[120,0.8],[400,1.2],[1000,2.0],[1e9,3.0]],
+    v:[[6,0.5],[30,1.0],[120,1.5],[400,2.5],[1000,4.0],[1e9,6.0]]
+  }[k];
+
+  let tol=0;
+  for(const [lim,v] of table){
+    if(d0<=lim){ tol=v; break; }
+  }
+
+  out2768.innerHTML=`
+<b>Ergebnis:</b><br>
+Nennmaß: ${d0.toFixed(3)} mm<br>
+Toleranz: ±${tol} mm<br><br>
+<b>${(d0-tol).toFixed(3)} … ${(d0+tol).toFixed(3)} mm</b>
+`;
 }
 </script>
 
 </body>
 </html>
-``
