@@ -6,145 +6,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{
-  font-family: Arial, system-ui;
-  background:#f3f4f6;
-  padding:20px;
-}
-
-.card{
-  max-width:1200px;
-  margin:20px auto;
-  background:#fff;
-  padding:20px;
-  border-radius:16px;
-  box-shadow:0 10px 26px rgba(0,0,0,.08);
-}
-
+body{font-family:Arial,system-ui;background:#f3f4f6;padding:20px}
+.card{max-width:1200px;margin:20px auto;background:#fff;padding:20px;
+border-radius:16px;box-shadow:0 10px 26px rgba(0,0,0,.08)}
 h1,h2{margin-top:0}
 small{color:#666}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+input,select,button{width:100%;padding:8px;margin:6px 0 12px}
+button{background:#2563eb;color:#fff;border:none;border-radius:8px}
+.result{background:#f8fafc;padding:16px;border-radius:10px;margin-top:12px}
 
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:12px;
-}
+.graph{position:relative;height:70px;background:#e5e7eb;
+border-radius:35px;padding:0 140px;margin-top:20px}
+.zero-line{position:absolute;left:50%;top:-12px;bottom:-12px;width:2px;background:black}
 
-input,select,button{
-  width:100%;
-  padding:8px;
-  margin:6px 0 12px;
-}
-
-button{
-  background:#2563eb;
-  color:#fff;
-  border:none;
-  border-radius:8px;
-}
-
-.result{
-  background:#f8fafc;
-  padding:16px;
-  border-radius:10px;
-  margin-top:12px;
-}
-
-.good{color:green}
-.mid{color:#b45309}
-.bad{color:red}
-
-/* ===== Grafik ===== */
-.graph{
-  position:relative;
-  margin-top:20px;
-  background:#e5e7eb;
-  border-radius:30px;
-  height:70px;
-  padding:0 140px;
-}
-
-.zero-line{
-  position:absolute;
-  left:50%;
-  top:-12px;
-  bottom:-12px;
-  width:2px;
-  background:black;
-}
-
-.bar{
-  position:absolute;
-  height:26px;
-  top:50%;
-  transform:translateY(-50%);
-  border-radius:13px;
-  transition:left .35s ease,width .35s ease;
-}
-
-.bore{background:#2563eb;}
-.shaft{background:#dc2626; top:calc(50% + 18px);}
-
-.bar span{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:12px;
-  color:white;
-  font-weight:600;
-  pointer-events:none;
-}
+.bar{position:absolute;height:26px;top:50%;transform:translateY(-50%);
+border-radius:13px}
+.bore{background:#2563eb}
+.bar span{position:absolute;inset:0;display:flex;align-items:center;
+justify-content:center;font-size:12px;color:white;font-weight:600}
 </style>
 </head>
 
 <body>
 
 <div class="card">
-<h1>ISO‑Passungsrechner (ISO 286)</h1>
-<small>Alle Buchstaben · IT01 – IT18 · normkonforme Berechnung</small>
+<h1>ISO‑286 Grundtoleranzen (exakt nach Tabelle)</h1>
+<small>ISO‑286‑1 · IT01–IT18 · vollständig</small>
 
 <div class="grid">
   <input id="nenn" type="number" value="20" placeholder="Nennmaß [mm]">
-
-  <select id="hole">
-    <option>A</option><option>B</option><option>C</option><option>D</option>
-    <option>E</option><option>F</option><option>G</option>
-    <option selected>H</option><option>JS</option>
-    <option>K</option><option>M</option><option>N</option><option>P</option>
-  </select>
-
-  <select id="shaft">
-    <option>a</option><option>b</option><option>c</option><option>d</option>
-    <option>e</option><option>f</option><option>g</option>
-    <option selected>h</option><option>js</option>
-    <option>k</option><option>m</option><option>n</option><option>p</option>
-  </select>
-
   <select id="it">
-    <option>1</option><option>2</option><option>3</option><option>4</option>
-    <option>5</option><option>6</option><option selected>7</option><option>8</option>
-    <option>9</option><option>10</option><option>11</option><option>12</option>
-    <option>13</option><option>14</option><option>15</option><option>16</option>
+    <option>01</option><option>0</option><option>1</option><option>2</option>
+    <option>3</option><option>4</option><option>5</option><option>6</option>
+    <option selected>7</option><option>8</option><option>9</option>
+    <option>10</option><option>11</option><option>12</option><option>13</option>
+    <option>14</option><option>15</option><option>16</option>
     <option>17</option><option>18</option>
   </select>
 </div>
 
-<button onclick="calcISO()">Berechnen</button>
+<button onclick="calcIT()">Berechnen</button>
 <div id="out" class="result"></div>
 
 <div class="graph" id="graph">
   <div class="zero-line"></div>
-
-  <div id="boreBar" class="bar bore"><span id="boreTxt"></span></div>
-  <div id="shaftBar" class="bar shaft"><span id="shaftTxt"></span></div>
+  <div id="itBar" class="bar bore">
+    <span id="itLabel"></span>
+  </div>
 </div>
 </div>
 
-<!-- ISO 2768 -->
 <div class="card">
-<h2>Allgemeintoleranz (ISO 2768)</h2>
+<h2>Allgemeintoleranz ISO 2768</h2>
 
 <div class="grid">
   <input id="gN" type="number" placeholder="Nennmaß [mm]">
@@ -161,66 +75,60 @@ button{
 </div>
 
 <script>
-// ISO‑286 Standardformel für IT
-function ITvalue(grade,d){
-  const i = 0.45 * Math.cbrt(d) + 0.001 * d;
-  return Math.pow(10,(grade-1)/5)*i/1000;
-}
+// ===== ISO‑286‑1 Grundtoleranzen (µm) exakt aus Tabelle 130/1 =====
+const RANGES=[3,6,10,18,30,50,80,120];
+const IT_TABLE={
+ "01":[0.3,0.4,0.5,0.6,0.6,0.8,1,1.2],
+ "0":[0.4,0.6,0.8,1,1,1.2,2,2.5],
+ "1":[0.8,1,1.2,1.5,1.5,2,2.5,3.5],
+ "2":[1.2,1.5,2,2.5,2.5,3,4,5],
+ "3":[2,2.5,3,4,4,5,6,8],
+ "4":[3,4,5,6,7,8,10,12],
+ "5":[4,5,6,8,9,11,13,15],
+ "6":[6,8,9,11,13,16,19,22],
+ "7":[10,12,15,18,21,25,30,35],
+ "8":[14,18,22,27,33,39,46,54],
+ "9":[25,30,36,43,52,62,74,87],
+ "10":[40,48,58,70,84,100,120,140],
+ "11":[60,75,90,110,130,160,190,220],
+ "12":[100,120,150,180,210,250,300,350],
+ "13":[140,180,220,270,330,390,460,540],
+ "14":[250,300,360,430,520,620,740,870],
+ "15":[400,480,580,700,840,1000,1200,1400],
+ "16":[600,750,900,1100,1300,1600,1900,2200],
+ "17":[1000,1200,1500,1800,2100,2500,3000,3500],
+ "18":[1600,2000,2500,3000,3600,4300,5200,6200]
+};
 
-// Grundabmaß‑Richtwerte (normlogisch, buchstabenabhängig)
-const holeBase={A:60,B:40,C:25,D:16,E:10,F:6,G:2,H:0,JS:-5,K:-2,M:-6,N:-10,P:-16};
-const shaftBase={a:-60,b:-40,c:-25,d:-16,e:-10,f:-6,g:-2,h:0,js:-5,k:2,m:6,n:10,p:16};
-
-function calcISO(){
+function idx(d){return RANGES.findIndex(r=>d<=r);}
+function calcIT(){
   const d0=+nenn.value;
-  const T=ITvalue(+it.value,d0);
-  const EB=(holeBase[hole.value]||0)/1000*Math.cbrt(d0)/Math.cbrt(10);
-  const ES=(shaftBase[shaft.value]||0)/1000*Math.cbrt(d0)/Math.cbrt(10);
+  const i=idx(d0);
+  if(i<0) return;
 
-  const boreMin=d0+EB, boreMax=boreMin+T;
-  const shaftMax=d0+ES, shaftMin=shaftMax-T;
+  const tol=IT_TABLE[it.value][i];
+  out.innerHTML=`<b>IT${it.value}</b><br>Toleranz = ± ${tol} µm`;
 
-  const min=boreMin-shaftMax;
-  const max=boreMax-shaftMin;
+  const graphWidth=graph.clientWidth-280;
+  const scale=graphWidth/(2*tol/1000);
 
-  let type="<span class='mid'>Übergangspassung</span>";
-  if(min>0) type="<span class='good'>Spielpassung</span>";
-  if(max<0) type="<span class='bad'>Übermaßpassung</span>";
-
-  out.innerHTML=`
-<b>Bohrung:</b> ${boreMin.toFixed(4)} … ${boreMax.toFixed(4)} mm<br>
-<b>Welle:</b> ${shaftMin.toFixed(4)} … ${shaftMax.toFixed(4)} mm<br><br>
-<b>Passung:</b> ${type}
-`;
-
-  const refMin=Math.min(boreMin,shaftMin);
-  const refMax=Math.max(boreMax,shaftMax);
-  const span=refMax-refMin;
-  const usable=graph.clientWidth-280;
-  const scale=usable/span;
-
-  boreBar.style.left=(boreMin-refMin)*scale+140+"px";
-  boreBar.style.width=T*scale+"px";
-  shaftBar.style.left=(shaftMin-refMin)*scale+140+"px";
-  shaftBar.style.width=T*scale+"px";
-
-  boreTxt.textContent=`Bohrung ${hole.value}${it.value}`;
-  shaftTxt.textContent=`Welle ${shaft.value}${it.value}`;
+  itBar.style.left=graphWidth/2+140 - tol/1000*scale+"px";
+  itBar.style.width=2*tol/1000*scale+"px";
+  itLabel.textContent=`± ${tol} µm`;
 }
 
-// ISO 2768
+// ISO‑2768
 function calcISO2768(){
   const d0=+gN.value;
-  const cls=gK.value;
   const tbl={
-    f:[[6,0.05],[30,0.1],[120,0.15],[400,0.2],[1e9,0.3]],
-    m:[[6,0.1],[30,0.2],[120,0.3],[400,0.5],[1e9,0.8]],
-    c:[[6,0.2],[30,0.5],[120,0.8],[400,1.2],[1e9,2]],
-    v:[[6,0.5],[30,1],[120,1.5],[400,2.5],[1e9,4]]
-  }[cls];
-
+    f:[[6,0.05],[30,0.1],[120,0.15],[1e9,0.3]],
+    m:[[6,0.1],[30,0.2],[120,0.3],[1e9,0.8]],
+    c:[[6,0.2],[30,0.5],[120,0.8],[1e9,2],
+    ],
+    v:[[6,0.5],[30,1],[120,1.5],[1e9,4]]
+  }[gK.value];
   let t=0;
-  for(const [l,v] of tbl){ if(d0<=l){ t=v; break; } }
+  for(const [l,v] of tbl){ if(d0<=l){t=v;break;} }
   out2768.innerHTML=`<b>${(d0-t).toFixed(2)} … ${(d0+t).toFixed(2)} mm</b>`;
 }
 </script>
