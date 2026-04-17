@@ -2,22 +2,73 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MechTab Pro – Engineering Tool</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MechTab Pro – MAXXED</title>
 
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#f2f2f2;margin:0;padding:16px}
-h1,h2{margin:6px 0}
-small{color:#666}
-.card{background:#fff;padding:14px;border-radius:10px;margin-bottom:14px}
-input,select{width:100%;padding:6px;margin:4px 0}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.result{border-bottom:1px solid #ddd;padding:6px 0}
-.badge{font-size:12px;background:#eee;border-radius:6px;padding:2px 6px}
+:root{
+  --bg:#f2f4f7;
+  --card:#ffffff;
+  --accent:#2563eb;
+  --text:#111827;
+  --muted:#6b7280;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:16px;
+  font-family:Inter,system-ui,Segoe UI,Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+h1,h2,h3{margin:.4em 0}
+small{color:var(--muted)}
+
+.card{
+  background:var(--card);
+  padding:16px;
+  border-radius:16px;
+  margin-bottom:16px;
+  box-shadow:0 6px 20px rgba(0,0,0,.06);
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+}
+input,select{
+  width:100%;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #d1d5db;
+  font-size:14px;
+}
+input[type=range]{padding:0}
+.badge{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#e5e7eb;
+  font-size:12px;
+}
+.result{
+  padding:10px 0;
+  border-bottom:1px solid #e5e7eb;
+}
+.score{
+  font-weight:600;
+  color:var(--accent);
+}
+footer{
+  text-align:center;
+  font-size:12px;
+  color:var(--muted);
+  margin-top:24px;
+}
 </style>
 </head>
 
@@ -26,151 +77,128 @@ input,select{width:100%;padding:6px;margin:4px 0}
 
 <script type="text/babel">
 
-/* ============================================================
-   MATERIALDATENBANK – INDUSTRIENIVEAU
-   >200 Werkstoffe, normnahe Richtwerte
-   ============================================================ */
+/* ============================
+   MATERIAL GENERATION ENGINE
+   ============================ */
 
 function generateMaterials(){
-  const list = [];
-  let id = 0;
+  const out=[];
+  let id=0;
 
-  const steels = [
-    {name:"S235", Rm:360, Rp:235, cost:1},
-    {name:"S355", Rm:510, Rp:355, cost:1},
-    {name:"42CrMo4", Rm:900, Rp:650, cost:2},
-    {name:"Toolox 44", Rm:1450, Rp:1300, cost:3}
+  const families=[
+    {base:"S235",art:"Baustahl",Rm:360,E:210,d:7850,temp:400},
+    {base:"S355",art:"Baustahl",Rm:510,E:210,d:7850,temp:400},
+    {base:"42CrMo4",art:"Vergütungsstahl",Rm:900,E:210,d:7850,temp:450},
+    {base:"Toolox 44",art:"Werkzeugstahl",Rm:1450,E:210,d:7860,temp:500},
+    {base:"Al 6082",art:"Aluminium",Rm:340,E:70,d:2700,temp:200},
+    {base:"Al 7075",art:"Aluminium",Rm:560,E:70,d:2810,temp:200},
+    {base:"PLA",art:"3D‑Druck Kunststoff",Rm:60,E:3.5,d:1240,temp:60,print:true},
+    {base:"ABS",art:"3D‑Druck Kunststoff",Rm:40,E:2.1,d:1040,temp:90,print:true},
+    {base:"PETG",art:"3D‑Druck Kunststoff",Rm:50,E:2.0,d:1270,temp:80,print:true},
+    {base:"Nylon",art:"3D‑Druck Kunststoff",Rm:70,E:2.8,d:1150,temp:120,print:true},
+    {base:"CF‑Nylon",art:"3D‑Druck Kunststoff",Rm:120,E:7.0,d:1200,temp:140,print:true}
   ];
 
-  const aluminium = [
-    {name:"Al 6061", Rm:310, Rp:275},
-    {name:"Al 6082", Rm:340, Rp:300},
-    {name:"Al 7075", Rm:560, Rp:480}
-  ];
-
-  const plastics = [
-    {name:"PLA", Rm:60, E:3.5},
-    {name:"ABS", Rm:40, E:2.1},
-    {name:"PETG", Rm:50, E:2.0},
-    {name:"Nylon", Rm:70, E:2.8},
-    {name:"CF‑Nylon", Rm:120, E:7.0}
-  ];
-
-  // Stähle (100 Varianten)
-  steels.forEach(base=>{
-    for(let i=0;i<25;i++){
-      list.push({
+  families.forEach(f=>{
+    for(let i=1;i<=20;i++){
+      out.push({
         id:id++,
-        name:`${base.name} – Zustand ${i+1}`,
-        art:"Stahl",
-        Rm:base.Rm + i*5,
-        Rp:base.Rp + i*4,
-        E:210,
-        dichte:7850,
-        temp:400,
-        zerspan:4,
-        schweißen:i<10?5:2,
-        verfahren:{fräsen:5,drehen:5,schweißen:4,biegen:4,druck3D:0}
+        name:`${f.base} – Var. ${i}`,
+        art:f.art,
+        Rm:f.Rm + i*2,
+        Rp:(f.Rm*0.75)|0,
+        E:f.E,
+        d:f.d,
+        temp:f.temp,
+        fräsen:f.print?1:5,
+        drehen:f.print?1:4,
+        schweißen:f.art==="Baustahl"?5:(f.art==="Aluminium"?4:1),
+        druck3D:f.print?5:0
       });
     }
   });
-
-  // Aluminium (60 Varianten)
-  aluminium.forEach(base=>{
-    for(let i=0;i<20;i++){
-      list.push({
-        id:id++,
-        name:`${base.name} – T${i}`,
-        art:"Aluminium",
-        Rm:base.Rm+i*3,
-        Rp:base.Rp+i*2,
-        E:70,
-        dichte:2700,
-        temp:200,
-        zerspan:5,
-        schweißen:4,
-        verfahren:{fräsen:5,drehen:4,schweißen:4,biegen:4,druck3D:0}
-      });
-    }
-  });
-
-  // Kunststoffe / 3D‑Druck (50 Varianten)
-  plastics.forEach(p=>{
-    for(let i=0;i<10;i++){
-      list.push({
-        id:id++,
-        name:`${p.name} – FDM ${i+1}`,
-        art:"3D‑Druck Kunststoff",
-        Rm:p.Rm+i*2,
-        Rp:(p.Rm*0.8)|0,
-        E:p.E,
-        dichte:1200,
-        temp:80,
-        zerspan:1,
-        schweißen:0,
-        verfahren:{fräsen:1,drehen:1,schweißen:0,biegen:0,druck3D:5}
-      });
-    }
-  });
-
-  return list;
+  return out;
 }
 
 const materials = generateMaterials();
 
-/* ============================================================
+/* ============================
    APP
-   ============================================================ */
+   ============================ */
 
 function App(){
   const [minRm,setMinRm]=React.useState(0);
-  const [gewicht,setGewicht]=React.useState(3);
-  const [verfahren,setVerfahren]=React.useState("");
+  const [maxD,setMaxD]=React.useState(9000);
+  const [wRm,setWRm]=React.useState(3);
+  const [wD,setWD]=React.useState(2);
+  const [proc,setProc]=React.useState("");
 
-  const results = materials
-    .filter(m=>m.Rm>=minRm)
+  const ranked = materials
+    .filter(m=>m.Rm>=minRm && m.d<=maxD)
     .map(m=>{
-      let score = (m.Rm/100)*gewicht;
-      if(verfahren && m.verfahren[verfahren]) score += m.verfahren[verfahren]*4;
-      return {...m,score};
+      let s  = (m.Rm/100)*wRm;
+      s     -= (m.d/1000)*wD;
+      if(proc) s += (m[proc]||0)*4;
+      return {...m,score:s};
     })
     .sort((a,b)=>b.score-a.score)
-    .slice(0,20);
+    .slice(0,25);
 
   return(
-  <div>
-    <h1>MechTab Pro</h1>
+  <>
+    <h1>MechTab Pro <span className="badge">MAXXED</span></h1>
     <small>Richtwerte gemäß Normenauszug – keine Garantie</small>
 
     <div className="card">
-      <h2>Werkstoffauswahl</h2>
-      <label>min. Zugfestigkeit Rm [MPa]</label>
-      <input type="number" value={minRm} onChange={e=>setMinRm(+e.target.value)} />
-      <label>Wichtigkeit (1–5)</label>
-      <input type="range" min="1" max="5" value={gewicht} onChange={e=>setGewicht(+e.target.value)} />
-      <label>Fertigungsverfahren</label>
-      <select onChange={e=>setVerfahren(e.target.value)}>
-        <option value="">egal</option>
-        <option value="fräsen">Fräsen</option>
-        <option value="drehen">Drehen</option>
-        <option value="schweißen">Schweißen</option>
-        <option value="druck3D">3D‑Druck</option>
-      </select>
+      <h2>Werkstoff‑Filter</h2>
+      <div className="grid">
+        <div>
+          <label>min. Zugfestigkeit Rm [MPa]</label>
+          <input type="number" value={minRm} onChange={e=>setMinRm(+e.target.value)}/>
+        </div>
+        <div>
+          <label>max. Dichte [kg/m³]</label>
+          <input type="number" value={maxD} onChange={e=>setMaxD(+e.target.value)}/>
+        </div>
+        <div>
+          <label>Wichtigkeit Festigkeit</label>
+          <input type="range" min="1" max="5" value={wRm} onChange={e=>setWRm(+e.target.value)}/>
+        </div>
+        <div>
+          <label>Wichtigkeit Leichtbau</label>
+          <input type="range" min="1" max="5" value={wD} onChange={e=>setWD(+e.target.value)}/>
+        </div>
+        <div>
+          <label>Fertigungsverfahren</label>
+          <select onChange={e=>setProc(e.target.value)}>
+            <option value="">egal</option>
+            <option value="fräsen">Fräsen</option>
+            <option value="drehen">Drehen</option>
+            <option value="schweißen">Schweißen</option>
+            <option value="druck3D">3D‑Druck</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div className="card">
       <h2>Top‑Werkstoffe ({materials.length} gesamt)</h2>
-      {results.map(m=>(
+      {ranked.map(m=>(
         <div key={m.id} className="result">
           <b>{m.name}</b> <span className="badge">{m.art}</span><br/>
-          Rm {m.Rm} MPa · Rp {m.Rp} MPa · E {m.E} GPa · Score {m.score.toFixed(1)}
+          Rm {m.Rm} MPa · E {m.E} GPa · ρ {m.d} kg/m³ · T {m.temp}°C<br/>
+          <span className="score">Score {m.score.toFixed(1)}</span>
         </div>
       ))}
     </div>
 
     <Elektro/>
     <Fertigung/>
-  </div>
+
+    <footer>
+      MechTab Pro · Offline Engineering Tool · v1.0
+    </footer>
+  </>
   );
 }
 
@@ -184,10 +212,12 @@ function Elektro(){
   return(
   <div className="card">
     <h2>EST‑Rechner</h2>
-    <input placeholder="U [V]" value={U} onChange={e=>setU(e.target.value)} />
-    <input placeholder="I [A]" value={I} onChange={e=>setI(e.target.value)} />
+    <div className="grid">
+      <input placeholder="U [V]" value={U} onChange={e=>setU(e.target.value)}/>
+      <input placeholder="I [A]" value={I} onChange={e=>setI(e.target.value)}/>
+    </div>
     <button onClick={()=>U&&I&&setP((U*I).toFixed(2))}>Berechnen</button>
-    {P && <div>P = {P} W</div>}
+    {P && <div>Leistung P = <b>{P}</b> W</div>}
   </div>
   );
 }
@@ -202,8 +232,10 @@ function Fertigung(){
   return(
   <div className="card">
     <h2>Fertigungstechnik</h2>
-    <input placeholder="vc [m/min]" value={vc} onChange={e=>setVc(e.target.value)} />
-    <input placeholder="∅ Werkzeug [mm]" value={d} onChange={e=>setD(e.target.value)} />
+    <div className="grid">
+      <input placeholder="vc [m/min]" value={vc} onChange={e=>setVc(e.target.value)}/>
+      <input placeholder="Ø Werkzeug [mm]" value={d} onChange={e=>setD(e.target.value)}/>
+    </div>
     {n && <div>Drehzahl n = <b>{n}</b> 1/min</div>}
   </div>
   );
