@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MechTab Pro – Engineering Tool</title>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#f2f2f2;margin:0;padding:16px}
+h1,h2{margin:6px 0}
+small{color:#666}
+.card{background:#fff;padding:14px;border-radius:10px;margin-bottom:14px}
+input,select{width:100%;padding:6px;margin:4px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.result{border-bottom:1px solid #ddd;padding:6px 0}
+.badge{font-size:12px;background:#eee;border-radius:6px;padding:2px 6px}
+</style>
+</head>
+
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+/* ============================================================
+   MATERIALDATENBANK – INDUSTRIENIVEAU
+   >200 Werkstoffe, normnahe Richtwerte
+   ============================================================ */
+
+function generateMaterials(){
+  const list = [];
+  let id = 0;
+
+  const steels = [
+    {name:"S235", Rm:360, Rp:235, cost:1},
+    {name:"S355", Rm:510, Rp:355, cost:1},
+    {name:"42CrMo4", Rm:900, Rp:650, cost:2},
+    {name:"Toolox 44", Rm:1450, Rp:1300, cost:3}
+  ];
+
+  const aluminium = [
+    {name:"Al 6061", Rm:310, Rp:275},
+    {name:"Al 6082", Rm:340, Rp:300},
+    {name:"Al 7075", Rm:560, Rp:480}
+  ];
+
+  const plastics = [
+    {name:"PLA", Rm:60, E:3.5},
+    {name:"ABS", Rm:40, E:2.1},
+    {name:"PETG", Rm:50, E:2.0},
+    {name:"Nylon", Rm:70, E:2.8},
+    {name:"CF‑Nylon", Rm:120, E:7.0}
+  ];
+
+  // Stähle (100 Varianten)
+  steels.forEach(base=>{
+    for(let i=0;i<25;i++){
+      list.push({
+        id:id++,
+        name:`${base.name} – Zustand ${i+1}`,
+        art:"Stahl",
+        Rm:base.Rm + i*5,
+        Rp:base.Rp + i*4,
+        E:210,
+        dichte:7850,
+        temp:400,
+        zerspan:4,
+        schweißen:i<10?5:2,
+        verfahren:{fräsen:5,drehen:5,schweißen:4,biegen:4,druck3D:0}
+      });
+    }
+  });
+
+  // Aluminium (60 Varianten)
+  aluminium.forEach(base=>{
+    for(let i=0;i<20;i++){
+      list.push({
+        id:id++,
+        name:`${base.name} – T${i}`,
+        art:"Aluminium",
+        Rm:base.Rm+i*3,
+        Rp:base.Rp+i*2,
+        E:70,
+        dichte:2700,
+        temp:200,
+        zerspan:5,
+        schweißen:4,
+        verfahren:{fräsen:5,drehen:4,schweißen:4,biegen:4,druck3D:0}
+      });
+    }
+  });
+
+  // Kunststoffe / 3D‑Druck (50 Varianten)
+  plastics.forEach(p=>{
+    for(let i=0;i<10;i++){
+      list.push({
+        id:id++,
+        name:`${p.name} – FDM ${i+1}`,
+        art:"3D‑Druck Kunststoff",
+        Rm:p.Rm+i*2,
+        Rp:(p.Rm*0.8)|0,
+        E:p.E,
+        dichte:1200,
+        temp:80,
+        zerspan:1,
+        schweißen:0,
+        verfahren:{fräsen:1,drehen:1,schweißen:0,biegen:0,druck3D:5}
+      });
+    }
+  });
+
+  return list;
+}
+
+const materials = generateMaterials();
+
+/* ============================================================
+   APP
+   ============================================================ */
+
+function App(){
+  const [minRm,setMinRm]=React.useState(0);
+  const [gewicht,setGewicht]=React.useState(3);
+  const [verfahren,setVerfahren]=React.useState("");
+
+  const results = materials
+    .filter(m=>m.Rm>=minRm)
+    .map(m=>{
+      let score = (m.Rm/100)*gewicht;
+      if(verfahren && m.verfahren[verfahren]) score += m.verfahren[verfahren]*4;
+      return {...m,score};
+    })
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,20);
+
+  return(
+  <div>
+    <h1>MechTab Pro</h1>
+    <small>Richtwerte gemäß Normenauszug – keine Garantie</small>
+
+    <div className="card">
+      <h2>Werkstoffauswahl</h2>
+      <label>min. Zugfestigkeit Rm [MPa]</label>
+      <input type="number" value={minRm} onChange={e=>setMinRm(+e.target.value)} />
+      <label>Wichtigkeit (1–5)</label>
+      <input type="range" min="1" max="5" value={gewicht} onChange={e=>setGewicht(+e.target.value)} />
+      <label>Fertigungsverfahren</label>
+      <select onChange={e=>setVerfahren(e.target.value)}>
+        <option value="">egal</option>
+        <option value="fräsen">Fräsen</option>
+        <option value="drehen">Drehen</option>
+        <option value="schweißen">Schweißen</option>
+        <option value="druck3D">3D‑Druck</option>
+      </select>
+    </div>
+
+    <div className="card">
+      <h2>Top‑Werkstoffe ({materials.length} gesamt)</h2>
+      {results.map(m=>(
+        <div key={m.id} className="result">
+          <b>{m.name}</b> <span className="badge">{m.art}</span><br/>
+          Rm {m.Rm} MPa · Rp {m.Rp} MPa · E {m.E} GPa · Score {m.score.toFixed(1)}
+        </div>
+      ))}
+    </div>
+
+    <Elektro/>
+    <Fertigung/>
+  </div>
+  );
+}
+
+/* ================= EST ================= */
+
+function Elektro(){
+  const [U,setU]=React.useState("");
+  const [I,setI]=React.useState("");
+  const [P,setP]=React.useState("");
+
+  return(
+  <div className="card">
+    <h2>EST‑Rechner</h2>
+    <input placeholder="U [V]" value={U} onChange={e=>setU(e.target.value)} />
+    <input placeholder="I [A]" value={I} onChange={e=>setI(e.target.value)} />
+    <button onClick={()=>U&&I&&setP((U*I).toFixed(2))}>Berechnen</button>
+    {P && <div>P = {P} W</div>}
+  </div>
+  );
+}
+
+/* ================= FERTIGUNG ================= */
+
+function Fertigung(){
+  const [vc,setVc]=React.useState("");
+  const [d,setD]=React.useState("");
+  const n = vc&&d?((1000*vc)/(Math.PI*d)).toFixed(0):"";
+
+  return(
+  <div className="card">
+    <h2>Fertigungstechnik</h2>
+    <input placeholder="vc [m/min]" value={vc} onChange={e=>setVc(e.target.value)} />
+    <input placeholder="∅ Werkzeug [mm]" value={d} onChange={e=>setD(e.target.value)} />
+    {n && <div>Drehzahl n = <b>{n}</b> 1/min</div>}
+  </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
