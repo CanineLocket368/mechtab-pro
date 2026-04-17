@@ -2,288 +2,131 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MechTab Pro – Full Build</title>
-
-<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+<title>ISO‑Passungsrechner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-:root{
-  --bg:#f3f4f6;
-  --card:#ffffff;
-  --text:#111827;
-  --muted:#6b7280;
-  --accent:#2563eb;
-}
 body{
-  margin:0;
-  padding:16px;
-  background:var(--bg);
-  font-family:Inter,system-ui,Segoe UI,Arial;
-  color:var(--text);
+  font-family:Arial,system-ui,Segoe UI;
+  background:#f3f4f6;
+  padding:20px;
 }
-h1,h2{margin:.4em 0}
-small{color:var(--muted)}
 .card{
-  background:var(--card);
-  padding:16px;
+  max-width:600px;
+  background:#fff;
+  padding:20px;
   border-radius:16px;
-  margin-bottom:16px;
-  box-shadow:0 8px 24px rgba(0,0,0,.06);
+  box-shadow:0 10px 25px rgba(0,0,0,.08);
+  margin:auto;
 }
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:10px;
-}
+h1{margin-top:0}
 input,select{
   width:100%;
-  padding:8px 10px;
-  border-radius:10px;
-  border:1px solid #d1d5db;
+  padding:8px;
+  margin:6px 0 14px 0;
 }
-input[type=range]{padding:0}
 .result{
-  padding:10px 0;
-  border-bottom:1px solid #e5e7eb;
+  background:#f9fafb;
+  padding:12px;
+  border-radius:10px;
 }
-.badge{
-  display:inline-block;
-  font-size:12px;
-  background:#e5e7eb;
-  padding:4px 8px;
-  border-radius:999px;
-}
-.score{color:var(--accent);font-weight:600}
-footer{
-  text-align:center;
-  font-size:12px;
-  color:var(--muted);
-  margin-top:24px;
-}
+.good{color:green}
+.bad{color:red}
+small{color:#666}
 </style>
 </head>
 
 <body>
-<div id="root"></div>
 
-<script type="text/babel">
+<div class="card">
+  <h1>ISO‑Passungsrechner</h1>
+  <small>Richtwerte nach ISO 286 – Ausbildungs‑ & Praxisnah</small>
 
-/* =========================================================
-   MATERIALDATENBANK (>200 Werkstoffe)
-   Richtwerte gemäss Normenauszug – keine Garantie
-   ========================================================= */
+  <label>Nennmaß [mm]</label>
+  <input type="number" id="nenn" value="20">
 
-function generateMaterials(){
-  const out=[];
-  let id=0;
+  <label>Bohrung (z. B. H7)</label>
+  <select id="bohrung">
+    <option value="H7">H7</option>
+    <option value="H8">H8</option>
+    <option value="H9">H9</option>
+  </select>
 
-  const families=[
-    {base:"S235",art:"Baustahl",Rm:360,Rp:235,E:210,d:7850,T:400},
-    {base:"S355",art:"Baustahl",Rm:510,Rp:355,E:210,d:7850,T:400},
-    {base:"42CrMo4",art:"Vergütungsstahl",Rm:900,Rp:650,E:210,d:7850,T:450},
-    {base:"Toolox 44",art:"Werkzeugstahl",Rm:1450,Rp:1300,E:210,d:7860,T:500},
-    {base:"Al 6082",art:"Aluminium",Rm:340,Rp:300,E:70,d:2700,T:200},
-    {base:"Al 7075",art:"Aluminium",Rm:560,Rp:480,E:70,d:2810,T:200},
-    {base:"PLA",art:"3D‑Druck Kunststoff",Rm:60,Rp:50,E:3.5,d:1240,T:60,print:true},
-    {base:"ABS",art:"3D‑Druck Kunststoff",Rm:40,Rp:30,E:2.1,d:1040,T:90,print:true},
-    {base:"PETG",art:"3D‑Druck Kunststoff",Rm:50,Rp:40,E:2.0,d:1270,T:80,print:true},
-    {base:"Nylon",art:"3D‑Druck Kunststoff",Rm:70,Rp:55,E:2.8,d:1150,T:120,print:true},
-    {base:"CF‑Nylon",art:"3D‑Druck Kunststoff",Rm:120,Rp:95,E:7.0,d:1200,T:140,print:true}
-  ];
+  <label>Welle (z. B. h6)</label>
+  <select id="welle">
+    <option value="h6">h6</option>
+    <option value="h7">h7</option>
+    <option value="f7">f7</option>
+    <option value="k6">k6</option>
+  </select>
 
-  families.forEach(f=>{
-    for(let i=1;i<=20;i++){
-      out.push({
-        id:id++,
-        name:`${f.base} – Variante ${i}`,
-        art:f.art,
-        Rm:f.Rm + i*2,
-        Rp:f.Rp + i*2,
-        E:f.E,
-        d:f.d,
-        T:f.T,
-        fräsen:f.print?1:5,
-        drehen:f.print?1:4,
-        schweißen:f.art==="Baustahl"?5:(f.art==="Aluminium"?4:1),
-        gießen:f.art==="Baustahl"?3:1,
-        schmieden:f.art==="Baustahl"?4:1,
-        umformen:f.art==="Baustahl"?4:1,
-        laser:4,
-        fdm:f.print?5:0,
-        sla:f.print?3:0,
-        sls:f.print?4:0,
-        mjf:f.print?4:0
-      });
-    }
-  });
-  return out;
+  <button onclick="rechnen()">Berechnen</button>
+
+  <div class="result" id="out"></div>
+</div>
+
+<script>
+/* ===================================================
+   ISO‑TOLERANZEN (vereinfachte Richtwerte)
+   Einheit: mm
+   =================================================== */
+
+const IT = {
+  6: d => 0.010,
+  7: d => 0.016,
+  8: d => 0.025,
+  9: d => 0.040
+};
+
+const shaftDeviation = {
+  h: d => 0,
+  f: d => -0.025,
+  k: d => +0.010
+};
+
+function rechnen(){
+  const d = Number(document.getElementById("nenn").value);
+  const bore = document.getElementById("bohrung").value;
+  const shaft = document.getElementById("welle").value;
+
+  const boreIT = Number(bore.replace("H",""));
+  const shaftIT = Number(shaft.replace(/[a-z]/gi,""));
+  const shaftPos = shaft[0];
+
+  const TB = IT[boreIT](d);
+  const TS = IT[shaftIT](d);
+  const ES = shaftDeviation[shaftPos](d);
+
+  const boreMin = d;
+  const boreMax = d + TB;
+
+  const shaftMax = d + ES;
+  const shaftMin = shaftMax - TS;
+
+  const minClear = (boreMin - shaftMax).toFixed(3);
+  const maxClear = (boreMax - shaftMin).toFixed(3);
+
+  let type = "";
+  if(maxClear < 0) type = "<span class='bad'>Presspassung</span>";
+  else if(minClear > 0) type = "<span class='good'>Spielpassung</span>";
+  else type = "Übergangspassung";
+
+  document.getElementById("out").innerHTML = `
+  <h3>Ergebnis</h3>
+  <b>Bohrung:</b><br>
+  ${boreMin.toFixed(3)} … ${boreMax.toFixed(3)} mm<br><br>
+
+  <b>Welle:</b><br>
+  ${shaftMin.toFixed(3)} … ${shaftMax.toFixed(3)} mm<br><br>
+
+  <b>Spiel / Übermaß:</b><br>
+  min: ${minClear} mm<br>
+  max: ${maxClear} mm<br><br>
+
+  <b>Passungsart:</b> ${type}
+  `;
 }
-
-const materials = generateMaterials();
-
-/* =========================================================
-   APP
-   ========================================================= */
-
-function App(){
-  const [minRm,setMinRm]=React.useState(0);
-  const [minRp,setMinRp]=React.useState(0);
-  const [minE,setMinE]=React.useState(0);
-  const [maxD,setMaxD]=React.useState(9000);
-  const [maxT,setMaxT]=React.useState(1000);
-
-  const [wRm,setWRm]=React.useState(3);
-  const [wD,setWD]=React.useState(2);
-  const [wT,setWT]=React.useState(2);
-
-  const [proc,setProc]=React.useState("");
-
-  const ranked = materials
-    .filter(m =>
-      m.Rm >= minRm &&
-      m.Rp >= minRp &&
-      m.E  >= minE &&
-      m.d  <= maxD &&
-      m.T  <= maxT
-    )
-    .map(m=>{
-      let s = (m.Rm/100)*wRm;
-      s -= (m.d/1000)*wD;
-      s += (m.T/100)*wT;
-      if(proc) s += (m[proc]||0)*4;
-      return {...m,score:s};
-    })
-    .sort((a,b)=>b.score-a.score)
-    .slice(0,25);
-
-  return(
-  <>
-    <h1>MechTab Pro <span className="badge">Full</span></h1>
-    <small>Richtwerte gemäss Normenauszug – keine Garantie</small>
-
-    <div className="card">
-      <h2>Werkstoff‑Filter & Gewichtung</h2>
-      <div className="grid">
-        <input placeholder="min. Rm [MPa]" type="number" onChange={e=>setMinRm(+e.target.value)} />
-        <input placeholder="min. Rp0.2 [MPa]" type="number" onChange={e=>setMinRp(+e.target.value)} />
-        <input placeholder="min. E‑Modul [GPa]" type="number" onChange={e=>setMinE(+e.target.value)} />
-        <input placeholder="max. Dichte [kg/m³]" type="number" onChange={e=>setMaxD(+e.target.value)} />
-        <input placeholder="max. Temp [°C]" type="number" onChange={e=>setMaxT(+e.target.value)} />
-
-        <label>Wichtigkeit Festigkeit
-          <input type="range" min="1" max="5" onChange={e=>setWRm(+e.target.value)} />
-        </label>
-        <label>Wichtigkeit Leichtbau
-          <input type="range" min="1" max="5" onChange={e=>setWD(+e.target.value)} />
-        </label>
-        <label>Wichtigkeit Temperatur
-          <input type="range" min="1" max="5" onChange={e=>setWT(+e.target.value)} />
-        </label>
-
-        <select onChange={e=>setProc(e.target.value)}>
-          <option value="">Fertigungsverfahren (egal)</option>
-          <option value="fräsen">Fräsen</option>
-          <option value="drehen">Drehen</option>
-          <option value="schweißen">Schweißen</option>
-          <option value="gießen">Gießen</option>
-          <option value="schmieden">Schmieden</option>
-          <option value="umformen">Umformen</option>
-          <option value="laser">Laser/Wasserstrahl</option>
-          <option value="fdm">3D‑Druck FDM</option>
-          <option value="sla">3D‑Druck SLA</option>
-          <option value="sls">3D‑Druck SLS</option>
-          <option value="mjf">3D‑Druck MJF</option>
-        </select>
-      </div>
-    </div>
-
-    <div className="card">
-      <h2>Top‑Werkstoffe ({materials.length} gesamt)</h2>
-      {ranked.map(m=>(
-        <div key={m.id} className="result">
-          <b>{m.name}</b> <span className="badge">{m.art}</span><br/>
-          Rm {m.Rm} · Rp {m.Rp} · E {m.E} GPa · ρ {m.d} · T {m.T}°C<br/>
-          <span className="score">Score {m.score.toFixed(1)}</span>
-        </div>
-      ))}
-    </div>
-
-    <Elektro/>
-    <Fertigung/>
-    <ToleranzRechner/>
-
-    <footer>MechTab Pro · Engineering Tool · Offlinefähig</footer>
-  </>
-  );
-}
-
-/* ================= RECHNER ================= */
-
-function Elektro(){
-  const [U,setU]=React.useState("");
-  const [I,setI]=React.useState("");
-  const [P,setP]=React.useState("");
-
-  return(
-  <div className="card">
-    <h2>EST‑Rechner</h2>
-    <div className="grid">
-      <input placeholder="U [V]" value={U} onChange={e=>setU(e.target.value)} />
-      <input placeholder="I [A]" value={I} onChange={e=>setI(e.target.value)} />
-    </div>
-    <button onClick={()=>U&&I&&setP((U*I).toFixed(2))}>Berechnen</button>
-    {P && <div>P = <b>{P}</b> W</div>}
-  </div>);
-}
-
-function Fertigung(){
-  const [vc,setVc]=React.useState("");
-  const [d,setD]=React.useState("");
-  const n = vc&&d?((1000*vc)/(Math.PI*d)).toFixed(0):"";
-
-  return(
-  <div className="card">
-    <h2>Fertigungstechnik</h2>
-    <div className="grid">
-      <input placeholder="vc [m/min]" value={vc} onChange={e=>setVc(e.target.value)} />
-      <input placeholder="Ø Werkzeug [mm]" value={d} onChange={e=>setD(e.target.value)} />
-    </div>
-    {n && <div>Drehzahl n = <b>{n}</b> 1/min</div>}
-  </div>);
-}
-
-function ToleranzRechner(){
-  const [n,setN]=React.useState("");
-  const [o,setO]=React.useState("");
-  const [u,setU]=React.useState("");
-
-  const max = n&&o?(+n + +o).toFixed(3):"";
-  const min = n&&u?(+n + +u).toFixed(3):"";
-  const tol = max&&min?(max-min).toFixed(3):"";
-
-  return(
-  <div className="card">
-    <h2>Toleranzrechner</h2>
-    <div className="grid">
-      <input placeholder="Nennmaß [mm]" value={n} onChange={e=>setN(e.target.value)} />
-      <input placeholder="+ obere Abw. [mm]" value={o} onChange={e=>setO(e.target.value)} />
-      <input placeholder="- untere Abw. [mm]" value={u} onChange={e=>setU(e.target.value)} />
-    </div>
-    {tol && (
-      <>
-        <div>Höchstmaß: <b>{max}</b> mm</div>
-        <div>Mindestmaß: <b>{min}</b> mm</div>
-        <div>Toleranz: <b>{tol}</b> mm</div>
-      </>
-    )}
-  </div>);
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-
 </script>
+
 </body>
 </html>
