@@ -2,30 +2,88 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>ISO‑286 Passungsrechner (Tabellenbasiert)</title>
+<title>ISO‑286 & ISO‑2768 Toleranzrechner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{font-family:Arial;background:#f3f4f6;padding:20px}
-.card{max-width:1000px;margin:auto;background:#fff;padding:20px;
-border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-input,select,button{width:100%;padding:8px;margin-top:6px}
-.result{background:#f9fafb;padding:14px;border-radius:10px;margin-top:10px}
-.good{color:green}.mid{color:#b45309}.bad{color:red}
 
-/* Grafik */
-.graph{position:relative;height:40px;background:#e5e7eb;border-radius:20px;margin-top:14px}
-.bar{position:absolute;height:100%;top:0;border-radius:20px}
-.bore{background:#2563eb}
-.shaft{background:#dc2626}
+<style>
+body{
+  font-family:Arial,system-ui;
+  background:#f3f4f6;
+  padding:20px;
+}
+
+.card{
+  max-width:1000px;
+  margin:20px auto;
+  background:#fff;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 10px 25px rgba(0,0,0,.08);
+}
+
+h1,h2{margin-top:0}
+small{color:#666}
+
+input,select,button{
+  width:100%;
+  padding:8px;
+  margin:6px 0 14px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:10px;
+}
+
+.result{
+  background:#f9fafb;
+  padding:14px;
+  border-radius:10px;
+  margin-top:10px;
+}
+
+.good{color:green}
+.mid{color:#b45309}
+.bad{color:red}
+
+/* ================= Grafik ================= */
+.graph{
+  position:relative;
+  height:40px;
+  background:#e5e7eb;
+  border-radius:20px;
+  margin-top:14px;
+}
+
+.bar{
+  position:absolute;
+  height:100%;
+  top:0;
+  border-radius:20px;
+}
+
+.bore{background:#2563eb}   /* Blau */
+.shaft{background:#dc2626} /* Rot */
+
+.legend{
+  margin-top:6px;
+  font-size:13px;
+}
+.legend span{
+  margin-right:15px;
+}
 </style>
 </head>
 
 <body>
-<div class="card">
 
-<h1>ISO‑286 Passungsrechner</h1>
-<small>Berechnung exakt nach ISO‑286‑Tabellen (gemäß hochgeladenem Buch)</small>
+<!-- ================================================= -->
+<!-- ISO 286 PASSUNG -->
+<!-- ================================================= -->
+<div class="card">
+<h1>ISO‑Passungsrechner (ISO 286)</h1>
+<small>Tabellenbasierte Berechnung nach ISO 286‑2 · Richtwerte</small>
 
 <div class="grid">
   <input id="d" type="number" value="20" placeholder="Nennmaß [mm]">
@@ -61,7 +119,7 @@ input,select,button{width:100%;padding:8px;margin-top:6px}
   </select>
 </div>
 
-<button onclick="calc()">Berechnen</button>
+<button onclick="calcISO()">Passung berechnen</button>
 
 <div id="out" class="result"></div>
 
@@ -70,17 +128,41 @@ input,select,button{width:100%;padding:8px;margin-top:6px}
   <div id="shaftBar" class="bar shaft"></div>
 </div>
 
+<div class="legend">
+  <span>🔵 Bohrung</span>
+  <span>🔴 Welle</span>
+</div>
+</div>
+
+<!-- ================================================= -->
+<!-- ISO 2768 ALLGEMEINTOLERANZ -->
+<!-- ================================================= -->
+<div class="card">
+<h2>Allgemeintoleranz‑Rechner (ISO 2768)</h2>
+<small>Für Längenmaße · ISO 2768‑1</small>
+
+<div class="grid">
+  <input id="g_nenn" type="number" placeholder="Nennmaß [mm]">
+  <select id="g_klasse">
+    <option value="f">fein (f)</option>
+    <option value="m" selected>mittel (m)</option>
+    <option value="c">grob (c)</option>
+    <option value="v">sehr grob (v)</option>
+  </select>
+</div>
+
+<button onclick="calcISO2768()">Toleranz berechnen</button>
+<div id="g_out" class="result"></div>
 </div>
 
 <script>
-// ================= NENNMASSBEREICHE =================
+// ================= Nennmaßbereiche =================
 const ranges = [
   {max:3},{max:6},{max:10},{max:18},{max:30},{max:50},
   {max:80},{max:120},{max:180},{max:250},{max:315},{max:400}
 ];
 
-// ================= IT‑WERTE (µm) =================
-// Aus Tabelle 130/1 (aus deinem Bild)
+// ================= IT‑Werte (µm) =================
 const IT = {
   6:[6,8,9,11,13,16,19,22,25,29,32,36],
   7:[10,12,15,18,21,25,30,35,40,46,52,57],
@@ -89,12 +171,11 @@ const IT = {
   10:[40,48,58,70,84,100,120,140,160,185,210,230]
 };
 
-// ================= ABMASSE BOHRUNGEN (µm) =================
-// stark gekürzte, aber korrekte Auswahl aus Tabelle 134/1
+// ================= Abmasse Bohrungen (µm) =================
 const holeDev = {
   H:[0,0,0,0,0,0,0,0,0,0,0,0],
-  G:[+2,+2,+3,+4,+6,+8,+10,+12,+15,+18,+22,+25],
-  F:[+6,+6,+8,+10,+13,+16,+19,+22,+25,+29,+33,+36],
+  G:[2,2,3,4,6,8,10,12,15,18,22,25],
+  F:[6,6,8,10,13,16,19,22,25,29,33,36],
   JS:[-5,-5,-7,-9,-11,-13,-15,-18,-21,-25,-29,-32],
   K:[-2,-2,-2,-3,-4,-5,-6,-8,-10,-12,-14,-16],
   M:[-4,-4,-6,-7,-8,-10,-12,-15,-18,-22,-25,-28],
@@ -102,35 +183,33 @@ const holeDev = {
   P:[-10,-10,-12,-14,-18,-21,-24,-29,-33,-38,-43,-48]
 };
 
-// ================= ABMASSE WELLEN (µm) =================
-// aus Tabelle 132/1 (repräsentativ korrekt)
+// ================= Abmasse Wellen (µm) =================
 const shaftDev = {
   h:[0,0,0,0,0,0,0,0,0,0,0,0],
   g:[-2,-3,-4,-5,-6,-7,-9,-10,-12,-14,-16,-18],
   f:[-6,-7,-9,-11,-13,-16,-19,-22,-25,-29,-32,-36],
   js:[-3,-4,-5,-6,-7,-8,-10,-12,-14,-16,-18,-21],
-  k:[+2,+3,+4,+5,+6,+7,+9,+10,+12,+14,+16,+18],
-  m:[+6,+7,+9,+11,+13,+16,+19,+22,+25,+29,+32,+36],
-  n:[+10,+11,+14,+16,+18,+22,+26,+30,+34,+38,+43,+48],
-  p:[+14,+16,+18,+21,+25,+30,+35,+40,+46,+52,+57,+63]
+  k:[2,3,4,5,6,7,9,10,12,14,16,18],
+  m:[6,7,9,11,13,16,19,22,25,29,32,36],
+  n:[10,11,14,16,18,22,26,30,34,38,43,48],
+  p:[14,16,18,21,25,30,35,40,46,52,57,63]
 };
 
-function idx(d){
+function rangeIndex(d){
   return ranges.findIndex(r=>d<=r.max);
 }
 
-function calc(){
+function calcISO(){
   const d0 = Number(d.value);
+  const r = rangeIndex(d0);
   const i = Number(it.value);
-  const r = idx(d0);
 
-  const T = IT[i][r]/1000;
-  const EB = holeDev[hole.value][r]/1000;
-  const ES = shaftDev[shaft.value][r]/1000;
+  const T = IT[i][r] / 1000;
+  const EB = holeDev[hole.value][r] / 1000;
+  const ES = shaftDev[shaft.value][r] / 1000;
 
   const boreMin = d0 + EB;
   const boreMax = boreMin + T;
-
   const shaftMax = d0 + ES;
   const shaftMin = shaftMax - T;
 
@@ -138,27 +217,53 @@ function calc(){
   const max = boreMax - shaftMin;
 
   let type = "<span class='mid'>Übergangspassung</span>";
-  if(min>0) type="<span class='good'>Spielpassung</span>";
-  if(max<0) type="<span class='bad'>Übermaß‑/Presspassung</span>";
+  if(min > 0) type = "<span class='good'>Spielpassung</span>";
+  if(max < 0) type = "<span class='bad'>Übermaß‑ / Presspassung</span>";
 
-  out.innerHTML=`
+  out.innerHTML = `
 <b>Bohrung:</b> ${boreMin.toFixed(4)} … ${boreMax.toFixed(4)} mm<br>
 <b>Welle:</b> ${shaftMin.toFixed(4)} … ${shaftMax.toFixed(4)} mm<br><br>
 <b>Spiel / Übermaß:</b><br>
 min: ${min.toFixed(4)} mm<br>
 max: ${max.toFixed(4)} mm<br><br>
-<b>Passung:</b> ${type}
+<b>Passungsart:</b> ${type}
 `;
 
-  const span = Math.max(boreMax,shaftMax)-Math.min(boreMin,shaftMin);
-  const scale = 320/span;
+  const span = Math.max(boreMax,shaftMax) - Math.min(boreMin,shaftMin);
+  const scale = 320 / span;
 
-  boreBar.style.left = ((boreMin-Math.min(boreMin,shaftMin))*scale)+"px";
+  boreBar.style.left = ((boreMin - Math.min(boreMin,shaftMin))*scale)+"px";
   boreBar.style.width = (T*scale)+"px";
-  shaftBar.style.left = ((shaftMin-Math.min(boreMin,shaftMin))*scale)+"px";
+  shaftBar.style.left = ((shaftMin - Math.min(boreMin,shaftMin))*scale)+"px";
   shaftBar.style.width = (T*scale)+"px";
 }
+
+// ================= ISO 2768 =================
+function calcISO2768(){
+  const d0 = Math.abs(Number(g_nenn.value));
+  const k = g_klasse.value;
+
+  const table = {
+    f:[[6,0.05],[30,0.1],[120,0.15],[400,0.2],[1000,0.3],[1e9,0.5]],
+    m:[[6,0.1],[30,0.2],[120,0.3],[400,0.5],[1000,0.8],[1e9,1.2]],
+    c:[[6,0.2],[30,0.5],[120,0.8],[400,1.2],[1000,2.0],[1e9,3.0]],
+    v:[[6,0.5],[30,1.0],[120,1.5],[400,2.5],[1000,4.0],[1e9,6.0]]
+  }[k];
+
+  let tol = 0;
+  for(const [lim,v] of table){
+    if(d0 <= lim){ tol = v; break; }
+  }
+
+  g_out.innerHTML = `
+<b>Ergebnis:</b><br>
+Nennmaß: ${d0.toFixed(3)} mm<br>
+Toleranz: ±${tol} mm<br><br>
+<b>${(d0-tol).toFixed(3)} … ${(d0+tol).toFixed(3)} mm</b>
+`;
+}
 </script>
+
 </body>
 </html>
-
+``
