@@ -130,3 +130,58 @@ function rechnen(){
 
 </body>
 </html>
+<div class="card">
+  <h2>Allgemeintoleranz‑Rechner (ISO 2768)</h2>
+  <small>Richtwerte nach ISO 2768 – Ausbildungs‑ & Praxisnah</small>
+
+  <label>Nennmaß [mm]</label>
+  <input type="number" id="isoNenn" placeholder="z. B. 120">
+
+  <label>Toleranzklasse</label>
+  <select id="isoKlasse">
+    <option value="f">fein (f)</option>
+    <option value="m" selected>mittel (m)</option>
+    <option value="c">grob (c)</option>
+    <option value="v">sehr grob (v)</option>
+  </select>
+
+  <button onclick="iso2768()">Berechnen</button>
+
+  <div id="isoOut" style="margin-top:10px"></div>
+</div>
+
+<script>
+function iso2768(){
+  const d = Math.abs(Number(document.getElementById("isoNenn").value));
+  const k = document.getElementById("isoKlasse").value;
+
+  if(!d){
+    document.getElementById("isoOut").innerHTML = "Bitte gültiges Maß eingeben.";
+    return;
+  }
+
+  // ISO 2768 Richtwerte (Längenmaße)
+  const table = {
+    f:  [[6,0.05],[30,0.1],[120,0.15],[400,0.2],[1000,0.3],[Infinity,0.5]],
+    m:  [[6,0.1],[30,0.2],[120,0.3],[400,0.5],[1000,0.8],[Infinity,1.2]],
+    c:  [[6,0.2],[30,0.5],[120,0.8],[400,1.2],[1000,2.0],[Infinity,3.0]],
+    v:  [[6,0.5],[30,1.0],[120,1.5],[400,2.5],[1000,4.0],[Infinity,6.0]]
+  };
+
+  let tol = 0;
+  for(const [limit, t] of table[k]){
+    if(d <= limit){ tol = t; break; }
+  }
+
+  const min = (d - tol).toFixed(3);
+  const max = (d + tol).toFixed(3);
+
+  document.getElementById("isoOut").innerHTML = `
+    <b>Ergebnis:</b><br>
+    Nennmaß: ${d.toFixed(3)} mm<br>
+    Toleranz: ±${tol} mm<br><br>
+    Maßbereich:<br>
+    <b>${min} … ${max} mm</b>
+  `;
+}
+</script>
