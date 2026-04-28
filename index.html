@@ -13,6 +13,9 @@ html,body{min-height:100%;background:#080808;color:#e0e0e0;font-family:'Segoe UI
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#0a0a0a}::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:3px}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 input,button{font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#222;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid #080808}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid #080808}
 </style>
 </head>
 <body><div id="root"></div>
@@ -204,21 +207,137 @@ function Card({mat,onClick,mob}){
 }
 
 function Modal({mat,onClose,mob}){
-  useEffect(()=>{if(!mat)return;document.body.style.overflow="hidden";return()=>{document.body.style.overflow="";};},[mat]);
+  const[drv,setDrv]=useState(null);       // which property is the driver key
+  const[drvVal,setDrvVal]=useState(null); // numeric value set by user
+  useEffect(()=>{
+    if(!mat)return;
+    document.body.style.overflow="hidden";
+    setDrv(null);setDrvVal(null); // reset on new material
+    return()=>{document.body.style.overflow="";};
+  },[mat]);
   if(!mat)return null;
   const c=CAT[mat.cat]||CAT["Stahl"];
   const comp=Object.entries(mat.comp||{});
   const PKEYS=["tensile","yield","elong","dens","mod","tmax","tmin","tcond","texp"];
+
+  // Which properties have a meaningful range?
+  const isRng=v=>Array.isArray(v)&&v[0]!==v[1];
+  // Driver candidates: hard, tensile, yield (in priority order)
+  const drvCands=[
+    isRng(mat.hard)&&{key:"hard",label:`Härte (${mat.hardU})`,min:rMin(mat.hard),max:rMax(mat.hard),step:mat.hardU==="HRC"?0.5:1},
+    isRng(mat.tensile)&&{key:"tensile",label:"Zugfestigkeit (MPa)",min:rMin(mat.tensile),max:rMax(mat.tensile),step:10},
+    isRng(mat.yield)&&{key:"yield",label:"Streckgrenze (MPa)",min:rMin(mat.yield),max:rMax(mat.yield),step:10},
+    isRng(mat.elong)&&{key:"elong",label:"Bruchdehnung (%)",min:rMin(mat.elong),max:rMax(mat.elong),step:0.5},
+  ].filter(Boolean);
+  const canInterp=drvCands.length>0;
+  const activeDrv=drvCands.find(d=>d.key===drv)||drvCands[0];
+
+  // t = position 0 (soft) → 1 (hard) in the driver's range
+  // For elong, higher value = softer, so t is inverted
+  let t=null;
+  if(drvVal!==null&&activeDrv){
+    const raw=(drvVal-activeDrv.min)/(activeDrv.max-activeDrv.min);
+    t=activeDrv.key==="elong"?1-Math.max(0,Math.min(1,raw)):Math.max(0,Math.min(1,raw));
+  }
+
+  // Interpolate a property value given t
+  // Properties that INCREASE with hardness: tensile, yield, hard → use t directly
+  // Properties that DECREASE with hardness: elong → use (1-t)
+  function calcInterp(key){
+    if(t===null)return null;
+    const v=key==="hard"?mat.hard:mat[key];
+    if(!isRng(v))return rMin(v); // single value stays constant
+    const inverse=(key==="elong");
+    const res=inverse?(v[1]-t*(v[1]-v[0])):(v[0]+t*(v[1]-v[0]));
+    return Math.round(res*10)/10;
+  }
+
+  // Display value: interpolated if t set, otherwise range string
+  function disp(key){
+    const iv=calcInterp(key);
+    return iv!==null?`${iv}`:fmtR(key==="hard"?mat.hard:mat[key]);
+  }
+
+  // Is a displayed value interpolated (i.e. specific, not a range)?
+  const specific=t!==null;
+
   return <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.87)",zIndex:1000,display:"flex",alignItems:mob?"flex-end":"center",justifyContent:"center",padding:mob?0:20,backdropFilter:"blur(4px)"}}>
     <div onClick={e=>e.stopPropagation()} style={{background:"#0d0d0d",border:`1px solid ${c.border}55`,borderRadius:mob?"16px 16px 0 0":12,width:"100%",maxWidth:mob?"100%":700,maxHeight:mob?"90vh":"87vh",overflowY:"auto",padding:mob?"24px 18px 36px":"28px 30px"}}>
       {mob&&<div style={{width:36,height:4,background:"#2a2a2a",borderRadius:2,margin:"0 auto 20px"}}/>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:12}}>
-        <div><div style={{fontSize:mob?19:22,fontWeight:800,color:"#f0f0f0",letterSpacing:"-0.02em"}}>{mat.name}</div>
-          <div style={{fontSize:12,color:c.text,marginTop:3}}>{mat.cat} · {mat.sub}</div></div>
+        <div>
+          <div style={{fontSize:mob?19:22,fontWeight:800,color:"#f0f0f0",letterSpacing:"-0.02em"}}>{mat.name}</div>
+          <div style={{fontSize:12,color:c.text,marginTop:3}}>{mat.cat} · {mat.sub}</div>
+        </div>
         <button onClick={onClose} style={{background:"none",border:"1px solid #2a2a2a",color:"#e0e0e0",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12,flexShrink:0}}>✕ Schließen</button>
       </div>
       <p style={{fontSize:13,color:"#d0d0d0",lineHeight:1.65,marginBottom:20}}>{mat.desc}</p>
-      {/* Qualitative */}
+
+      {/* ── ZUSTAND EINSTELLEN (nur wenn Wertebereiche vorhanden) ─────────────── */}
+      {canInterp&&<div style={{background:"#0a0a14",border:`1px solid ${c.border}55`,borderRadius:10,padding:"16px 18px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:11,color:c.text,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em"}}>
+            ⚙ Zustand / Wärmebehandlung
+          </span>
+          {specific&&<button onClick={()=>{setDrvVal(null);}} style={{fontSize:10,color:"#f59e0b",background:"none",border:"1px solid #f59e0b44",borderRadius:5,padding:"3px 9px",cursor:"pointer"}}>
+            ↺ Bereich anzeigen
+          </button>}
+        </div>
+
+        {/* Driver-Auswahl */}
+        {drvCands.length>1&&<div style={{display:"flex",gap:5,marginBottom:12,flexWrap:"wrap"}}>
+          {drvCands.map(d=><button key={d.key} onClick={()=>{setDrv(d.key);setDrvVal(null);}}
+            style={{padding:"4px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontWeight:600,
+              background:activeDrv?.key===d.key?c.bg:"#111",
+              border:activeDrv?.key===d.key?`1px solid ${c.border}88`:"1px solid #2a2a2a",
+              color:activeDrv?.key===d.key?c.text:"#d0d0d0"}}>{d.label}</button>)}
+        </div>}
+
+        {/* Slider + Eingabe */}
+        {activeDrv&&<div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,color:"#d0d0d0"}}>{activeDrv.label}</span>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input type="number" min={activeDrv.min} max={activeDrv.max} step={activeDrv.step}
+                value={drvVal!==null?drvVal:""} placeholder={`${activeDrv.min} – ${activeDrv.max}`}
+                onChange={e=>setDrvVal(e.target.value===""?null:Math.max(activeDrv.min,Math.min(activeDrv.max,Number(e.target.value))))}
+                style={{width:90,background:"#111",border:`1px solid ${c.border}55`,color:c.text,padding:"4px 8px",borderRadius:5,fontSize:12,fontFamily:"monospace",textAlign:"right"}}/>
+              <span style={{fontSize:10,color:"#888"}}>{activeDrv.key==="hard"?mat.hardU:PU[activeDrv.key]||""}</span>
+            </div>
+          </div>
+          <input type="range" min={activeDrv.min} max={activeDrv.max} step={activeDrv.step}
+            value={drvVal!==null?drvVal:activeDrv.min}
+            onChange={e=>setDrvVal(Number(e.target.value))}
+            style={{accentColor:c.text}}/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#555",marginTop:2}}>
+            <span>{activeDrv.min} (weich/geglüht)</span><span>(hart/vergütet) {activeDrv.max}</span>
+          </div>
+        </div>}
+
+        {/* Ergebnis: berechnete Einzelwerte */}
+        {specific&&<div style={{marginTop:14,padding:"12px 14px",background:c.bg,borderRadius:8,border:`1px solid ${c.border}33`}}>
+          <div style={{fontSize:9,color:"#b0b0b0",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>
+            Berechnete Einzelwerte bei diesem Zustand (lineare Interpolation)
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,flexWrap:"wrap"}}>
+            {[["tensile","Zugf.","MPa"],["yield","Streck.","MPa"],["elong","Dehnung","%"],["hard","Härte",mat.hardU]].map(([k,lb,u])=>{
+              const iv=calcInterp(k);
+              if(iv===null)return null;
+              const isDriver=activeDrv?.key===k;
+              return <div key={k} style={{opacity:isDriver?1:1}}>
+                <div style={{fontSize:9,color:"#b0b0b0",marginBottom:3}}>{lb}</div>
+                <div style={{fontSize:17,fontWeight:800,color:isDriver?"#ffffff":c.text,fontFamily:"monospace",lineHeight:1}}>{iv}</div>
+                <div style={{fontSize:9,color:"#888",marginTop:2}}>{u}</div>
+              </div>;
+            }).filter(Boolean)}
+          </div>
+          <div style={{fontSize:9,color:"#666",marginTop:10,borderTop:"1px solid #ffffff11",paddingTop:8}}>
+            ℹ Werte sind lineare Interpolation innerhalb des Bereichs – tatsächliche Werte können je nach Legierungscharge abweichen.
+          </div>
+        </div>}
+      </div>}
+
+      {/* ── QUALITATIVE EIGENSCHAFTEN ─────────────────────────────────────────── */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
         {Object.entries(QL).map(([k,lb])=>(
           <div key={k} style={{background:"#111",border:`1px solid ${c.border}33`,borderRadius:7,padding:"12px 14px"}}>
@@ -228,18 +347,31 @@ function Modal({mat,onClose,mob}){
           </div>
         ))}
       </div>
-      {/* Physikalische */}
+
+      {/* ── PHYSIKALISCHE EIGENSCHAFTEN ───────────────────────────────────────── */}
       <div style={{display:"grid",gridTemplateColumns:mob?"1fr 1fr":"repeat(4,1fr)",gap:8,marginBottom:20}}>
         {[...PKEYS,"hard"].map(k=>{
-          const isH=k==="hard";const rv=isH?mat.hard:mat[k];const lb=isH?"Härte":PL[k];const u=isH?mat.hardU:PU[k];
-          return <div key={k} style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:7,padding:"10px 12px"}}>
+          const isH=k==="hard";
+          const rawV=isH?mat.hard:mat[k];
+          const lb=isH?"Härte":PL[k];
+          const u=isH?mat.hardU:PU[k];
+          const interpV=specific?(isH?calcInterp("hard"):calcInterp(k)):null;
+          const showRange=!specific||interpV===null;
+          return <div key={k} style={{background:"#111",border:interpV!==null?`1px solid ${c.border}44`:"1px solid #1e1e1e",borderRadius:7,padding:"10px 12px",position:"relative"}}>
             <div style={{fontSize:9,color:"#b0b0b0",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.08em"}}>{lb}</div>
-            <div style={{fontSize:Array.isArray(rv)?12:15,fontWeight:700,color:c.text,fontFamily:"monospace",lineHeight:1.2}}>{fmtR(rv)}</div>
+            {interpV!==null
+              ?<>
+                  <div style={{fontSize:15,fontWeight:800,color:c.text,fontFamily:"monospace",lineHeight:1.2}}>{interpV}</div>
+                  <div style={{fontSize:9,color:"#666",fontFamily:"monospace",marginTop:1,textDecoration:"line-through"}}>{fmtR(rawV)}</div>
+                </>
+              :<div style={{fontSize:Array.isArray(rawV)?12:15,fontWeight:700,color:c.text,fontFamily:"monospace",lineHeight:1.2}}>{fmtR(rawV)}</div>
+            }
             <div style={{fontSize:9,color:"#a0a0a0",marginTop:2}}>{u}</div>
           </div>;
         })}
       </div>
-      {/* Zusammensetzung */}
+
+      {/* ── ZUSAMMENSETZUNG ───────────────────────────────────────────────────── */}
       {comp.length>0&&<div style={{marginBottom:16}}>
         <div style={{fontSize:10,color:"#c0c0c0",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>Chemische Zusammensetzung</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -249,7 +381,8 @@ function Modal({mat,onClose,mob}){
           </div>)}
         </div>
       </div>}
-      {/* 3D-Druck */}
+
+      {/* ── 3D-DRUCK ──────────────────────────────────────────────────────────── */}
       {mat.cat==="3D-Druck"&&<div style={{background:"rgba(124,58,237,0.07)",border:"1px solid #7c3aed33",borderRadius:8,padding:"14px 16px"}}>
         <div style={{fontSize:10,color:"#a78bfa",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>3D-Druck Parameter</div>
         {mat.pT?<div style={{display:"flex",gap:28}}>
