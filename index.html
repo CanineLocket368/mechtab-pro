@@ -1,202 +1,628 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8">
-<title>ISO‑286 / ISO‑2768 Passungsrechner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WerkstoffDB – Technische Materialdatenbank</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-body{font-family:Arial;background:#f3f4f6;padding:20px}
-.card{max-width:1200px;margin:20px auto;background:#fff;padding:20px;
-border-radius:16px;box-shadow:0 10px 26px rgba(0,0,0,.08)}
-h1,h2{margin-top:0}
-small{color:#666}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-  gap:12px
-}
-
-input,select,button{width:100%;padding:8px;margin:6px 0 12px}
-button{background:#2563eb;color:#fff;border:none;border-radius:8px}
-
-.result{background:#f8fafc;padding:16px;border-radius:10px;margin-top:12px}
-
-.good{color:green}
-.mid{color:#b45309}
-.bad{color:red}
-
-/* Grafik */
-.graph{
-  position:relative;
-  height:70px;
-  background:#e5e7eb;
-  border-radius:35px;
-  padding:0 140px;
-  margin-top:20px
-}
-.zero-line{
-  position:absolute;left:50%;top:-12px;bottom:-12px;
-  width:2px;background:black
-}
-.bar{
-  position:absolute;height:26px;top:50%;
-  transform:translateY(-50%);
-  border-radius:13px;
-  transition:left .35s ease,width .35s ease
-}
-.bore{background:#2563eb}
-.shaft{background:#dc2626;top:calc(50% + 18px)}
-.bar span{
-  position:absolute;inset:0;
-  display:flex;align-items:center;justify-content:center;
-  color:#fff;font-size:12px;font-weight:600
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #080808; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: #e0e0e0; overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input { outline: none; }
+  button { font-family: inherit; outline: none; }
+  * { -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
-
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect } = React;
 
-<!-- ================= ISO‑286 ================= -->
-<div class="card">
-<h1>ISO‑286 Passungsrechner</h1>
-<small>Bohrung und Welle mit separaten IT‑Graden</small>
+const MATERIALS = [
+  { id:1,  name:"Toolox 44",       category:"Stahl", sub:"Werkzeugstahl",
+    tensile:1400, yield:1200, elongation:10, hardness:44,  hardnessUnit:"HRC",
+    density:7.85, modulus:210, tempMax:500,  tempMin:-40,  thermalCond:30,  thermalExp:11.7,
+    composition:{C:0.40,Si:0.35,Mn:0.90,Cr:5.00,Mo:1.40,V:0.40},
+    desc:"Vorgehärteter Werkzeugstahl mit sehr guter Zähigkeit und Verschleißfestigkeit. Kein Nachbehandeln erforderlich. Ideal für Formen, Stempel und Lehren." },
+  { id:2,  name:"1.2379 (D2)",     category:"Stahl", sub:"Kaltarbeitsstahl",
+    tensile:900,  yield:700,  elongation:8,  hardness:60,  hardnessUnit:"HRC",
+    density:7.70, modulus:210, tempMax:250,  tempMin:-30,  thermalCond:20,  thermalExp:11.3,
+    composition:{C:1.55,Si:0.30,Mn:0.35,Cr:11.50,Mo:0.75,V:0.90},
+    desc:"Hochlegierter Kaltarbeitsstahl mit sehr hohem Chromgehalt. Exzellente Verschleißfestigkeit für Schneidwerkzeuge und Stanzwerkzeuge." },
+  { id:3,  name:"1.2344 (H13)",    category:"Stahl", sub:"Warmarbeitsstahl",
+    tensile:1000, yield:900,  elongation:10, hardness:52,  hardnessUnit:"HRC",
+    density:7.80, modulus:210, tempMax:600,  tempMin:-20,  thermalCond:25,  thermalExp:11.5,
+    composition:{C:0.40,Si:1.00,Mn:0.40,Cr:5.30,Mo:1.35,V:1.00},
+    desc:"Warmarbeitsstahl für Druckgussformen und Schmiedestempel. Sehr gute Warmzähigkeit und Anlassbeständigkeit bis 600 °C." },
+  { id:4,  name:"1.4301 (304)",    category:"Stahl", sub:"Edelstahl austenitisch",
+    tensile:515,  yield:205,  elongation:40, hardness:200, hardnessUnit:"HB",
+    density:7.93, modulus:193, tempMax:870,  tempMin:-196, thermalCond:16,  thermalExp:17.2,
+    composition:{C:0.07,Cr:18.00,Ni:8.00,Mn:2.00,Si:1.00},
+    desc:"Meistverwendeter austenitischer Edelstahl. Hohe Korrosionsbeständigkeit, nicht magnetisch, gut schweißbar und lebensmitteltauglich." },
+  { id:5,  name:"1.4404 (316L)",   category:"Stahl", sub:"Edelstahl austenitisch",
+    tensile:490,  yield:190,  elongation:40, hardness:190, hardnessUnit:"HB",
+    density:7.98, modulus:193, tempMax:870,  tempMin:-196, thermalCond:15,  thermalExp:16.5,
+    composition:{C:0.03,Cr:17.00,Ni:12.00,Mo:2.50,Mn:2.00},
+    desc:"Niedrigkohlenstoff-Edelstahl mit Molybdän für bessere Chloridbeständigkeit. Standard in der Medizintechnik und Chemieindustrie." },
+  { id:6,  name:"S235JR",          category:"Stahl", sub:"Baustahl",
+    tensile:360,  yield:235,  elongation:26, hardness:120, hardnessUnit:"HB",
+    density:7.85, modulus:210, tempMax:350,  tempMin:-20,  thermalCond:50,  thermalExp:12.0,
+    composition:{C:0.17,Mn:1.40,Si:0.35,P:0.045,S:0.045},
+    desc:"Allgemeiner Baustahl, am häufigsten im Stahlbau eingesetzt. Sehr gut schweißbar und einfach zu bearbeiten." },
+  { id:7,  name:"S355J2",          category:"Stahl", sub:"Baustahl",
+    tensile:470,  yield:355,  elongation:22, hardness:160, hardnessUnit:"HB",
+    density:7.85, modulus:210, tempMax:400,  tempMin:-20,  thermalCond:50,  thermalExp:12.0,
+    composition:{C:0.20,Mn:1.60,Si:0.55,Nb:0.05,V:0.13},
+    desc:"Hochfester Baustahl für tragende Konstruktionen im Maschinen- und Stahlbau. Gute Schweißbarkeit." },
+  { id:8,  name:"42CrMo4",         category:"Stahl", sub:"Vergütungsstahl",
+    tensile:1000, yield:800,  elongation:12, hardness:300, hardnessUnit:"HB",
+    density:7.85, modulus:210, tempMax:400,  tempMin:-40,  thermalCond:42,  thermalExp:12.3,
+    composition:{C:0.42,Cr:1.05,Mo:0.22,Mn:0.80,Si:0.25},
+    desc:"Legierter Vergütungsstahl für hochbeanspruchte Maschinenteile wie Wellen, Bolzen und Zahnräder." },
+  { id:9,  name:"16MnCr5",         category:"Stahl", sub:"Einsatzstahl",
+    tensile:780,  yield:590,  elongation:10, hardness:62,  hardnessUnit:"HRC",
+    density:7.84, modulus:210, tempMax:300,  tempMin:-40,  thermalCond:44,  thermalExp:11.8,
+    composition:{C:0.16,Mn:1.15,Cr:0.95,Si:0.25},
+    desc:"Einsatzstahl für Zahnräder und Wellen. Harte, verschleißfeste Randschicht durch Aufkohlen bei zähem Kern." },
+  { id:10, name:"1.2083 (420)",    category:"Stahl", sub:"Kunststoff-Formenstahl",
+    tensile:800,  yield:600,  elongation:12, hardness:54,  hardnessUnit:"HRC",
+    density:7.78, modulus:215, tempMax:400,  tempMin:-20,  thermalCond:25,  thermalExp:10.8,
+    composition:{C:0.42,Cr:13.50,Mn:0.65,Si:0.40},
+    desc:"Korrosionsbeständiger Formenstahl für Spritzgusswerkzeuge. Polierfähig auf Hochglanz." },
+  { id:40, name:"HSS M2",          category:"Stahl", sub:"Schnellarbeitsstahl",
+    tensile:900,  yield:700,  elongation:6,  hardness:65,  hardnessUnit:"HRC",
+    density:8.10, modulus:218, tempMax:600,  tempMin:-40,  thermalCond:20,  thermalExp:11.5,
+    composition:{C:0.85,W:6.35,Mo:5.00,Cr:4.15,V:1.90,Co:5.00},
+    desc:"Schnellarbeitsstahl für Zerspanungswerkzeuge. Behält Härte bis 600 °C. Bohrer, Fräser, Gewindeschneider." },
+  { id:11, name:"Aluminium 6061-T6", category:"Metall", sub:"Aluminium",
+    tensile:310,  yield:276,  elongation:12, hardness:95,  hardnessUnit:"HB",
+    density:2.70, modulus:68.9, tempMax:150, tempMin:-196, thermalCond:167, thermalExp:23.6,
+    composition:{Al:97.90,Mg:1.00,Si:0.60,Cu:0.28,Cr:0.20},
+    desc:"Vielseitige Aluminiumlegierung mit guter Festigkeit und Korrosionsbeständigkeit. Maschinenbau, Luft- und Raumfahrt." },
+  { id:12, name:"Aluminium 7075-T6", category:"Metall", sub:"Aluminium",
+    tensile:572,  yield:503,  elongation:11, hardness:150, hardnessUnit:"HB",
+    density:2.81, modulus:71.7, tempMax:120, tempMin:-196, thermalCond:130, thermalExp:23.4,
+    composition:{Al:90.00,Zn:5.60,Mg:2.50,Cu:1.60,Cr:0.23},
+    desc:"Hochfeste Aluminiumlegierung für Luft- und Raumfahrtanwendungen. Bestes Festigkeit-zu-Gewicht-Verhältnis." },
+  { id:13, name:"Titan Ti-6Al-4V",   category:"Metall", sub:"Titan",
+    tensile:950,  yield:880,  elongation:14, hardness:36,  hardnessUnit:"HRC",
+    density:4.43, modulus:113.8, tempMax:300,tempMin:-196, thermalCond:6.7, thermalExp:8.6,
+    composition:{Ti:90.00,Al:6.00,V:4.00},
+    desc:"Wichtigste Titanlegierung. Hervorragendes Festigkeit-Gewicht-Verhältnis, biokompatibel, sehr korrosionsbeständig." },
+  { id:14, name:"Kupfer C11000",     category:"Metall", sub:"Kupfer",
+    tensile:220,  yield:70,   elongation:45, hardness:40,  hardnessUnit:"HB",
+    density:8.94, modulus:117, tempMax:260,  tempMin:-196, thermalCond:388, thermalExp:17.0,
+    composition:{Cu:99.90},
+    desc:"Reinstkupfer mit exzellenter elektrischer und thermischer Leitfähigkeit. Elektrische Leiter, Wärmetauscher." },
+  { id:15, name:"Messing CuZn37",    category:"Metall", sub:"Kupferlegierung",
+    tensile:380,  yield:130,  elongation:40, hardness:100, hardnessUnit:"HB",
+    density:8.44, modulus:100, tempMax:200,  tempMin:-196, thermalCond:113, thermalExp:20.5,
+    composition:{Cu:63.00,Zn:37.00},
+    desc:"Standardmessing mit guter Bearbeitbarkeit und Korrosionsbeständigkeit. Armaturen, Fittings, Dekor." },
+  { id:16, name:"Bronze CuSn8",      category:"Metall", sub:"Kupferlegierung",
+    tensile:450,  yield:200,  elongation:25, hardness:130, hardnessUnit:"HB",
+    density:8.80, modulus:110, tempMax:300,  tempMin:-196, thermalCond:50,  thermalExp:17.5,
+    composition:{Cu:92.00,Sn:8.00},
+    desc:"Zinnbronze mit guter Verschleißfestigkeit und hervorragenden Gleiteigenschaften. Gleitlager, Buchsen, Zahnräder." },
+  { id:17, name:"Inconel 625",        category:"Metall", sub:"Superlegierung",
+    tensile:930,  yield:517,  elongation:42, hardness:200, hardnessUnit:"HB",
+    density:8.44, modulus:205, tempMax:980,  tempMin:-196, thermalCond:9.8, thermalExp:12.8,
+    composition:{Ni:62.00,Cr:22.00,Mo:9.00,Nb:3.60,Fe:3.00},
+    desc:"Nickelbasislegierung mit außergewöhnlicher Hitze- und Korrosionsbeständigkeit. Turbinen, Meerestechnik." },
+  { id:18, name:"Magnesium AZ31B",   category:"Metall", sub:"Magnesium",
+    tensile:260,  yield:200,  elongation:15, hardness:49,  hardnessUnit:"HB",
+    density:1.77, modulus:45,  tempMax:150,  tempMin:-50,  thermalCond:96,  thermalExp:26.0,
+    composition:{Mg:96.00,Al:3.00,Zn:1.00},
+    desc:"Leichteste Konstruktionslegierung. Sehr gutes Gewicht-Festigkeit-Verhältnis. Elektronikgehäuse, Automobil." },
+  { id:19, name:"PEEK",             category:"Kunststoff", sub:"Hochleistungskunststoff",
+    tensile:100,  yield:91,   elongation:35, hardness:85,  hardnessUnit:"Shore D",
+    density:1.32, modulus:3.6, tempMax:250,  tempMin:-65,  thermalCond:0.25,thermalExp:47,
+    composition:{}, desc:"Hochleistungsthermoplast. Medizin, Luft- und Raumfahrt, Chemie. Chemikalienresistent." },
+  { id:20, name:"Polycarbonat (PC)", category:"Kunststoff", sub:"Technischer Kunststoff",
+    tensile:65,   yield:60,   elongation:120,hardness:75,  hardnessUnit:"Shore D",
+    density:1.20, modulus:2.3, tempMax:125,  tempMin:-40,  thermalCond:0.20,thermalExp:65,
+    composition:{}, desc:"Transparenter Hochleistungskunststoff mit sehr hoher Schlagzähigkeit. Schutzscheiben, optische Anwendungen." },
+  { id:21, name:"PA 66 (Nylon 66)", category:"Kunststoff", sub:"Technischer Kunststoff",
+    tensile:83,   yield:70,   elongation:60, hardness:80,  hardnessUnit:"Shore D",
+    density:1.14, modulus:3.0, tempMax:100,  tempMin:-40,  thermalCond:0.23,thermalExp:80,
+    composition:{}, desc:"Weit verbreiteter technischer Kunststoff mit guter Festigkeit. Zahnräder, Lager, Gehäuse." },
+  { id:22, name:"POM (Acetal)",      category:"Kunststoff", sub:"Technischer Kunststoff",
+    tensile:67,   yield:65,   elongation:35, hardness:82,  hardnessUnit:"Shore D",
+    density:1.41, modulus:3.1, tempMax:100,  tempMin:-40,  thermalCond:0.31,thermalExp:110,
+    composition:{}, desc:"Hohe Steifigkeit, gute Gleiteigenschaften, geringe Feuchtigkeitsaufnahme. Präzisionsteile, Zahnräder." },
+  { id:23, name:"PTFE (Teflon)",     category:"Kunststoff", sub:"Hochleistungskunststoff",
+    tensile:25,   yield:14,   elongation:300,hardness:60,  hardnessUnit:"Shore D",
+    density:2.20, modulus:0.5, tempMax:260,  tempMin:-200, thermalCond:0.25,thermalExp:112,
+    composition:{}, desc:"Niedrigster Reibungskoeffizient aller Festkörper. Chemikalienresistent, biokompatibel. Dichtungen, Antihaft." },
+  { id:24, name:"ABS",               category:"Kunststoff", sub:"Standard-Kunststoff",
+    tensile:40,   yield:35,   elongation:25, hardness:70,  hardnessUnit:"Shore D",
+    density:1.05, modulus:2.1, tempMax:80,   tempMin:-20,  thermalCond:0.17,thermalExp:95,
+    composition:{}, desc:"Vielseitiger Standardkunststoff mit guter Schlagzähigkeit. Gehäuse, Spielzeug, Kfz-Innenteile." },
+  { id:25, name:"HDPE",              category:"Kunststoff", sub:"Standard-Kunststoff",
+    tensile:30,   yield:23,   elongation:700,hardness:65,  hardnessUnit:"Shore D",
+    density:0.95, modulus:1.0, tempMax:90,   tempMin:-70,  thermalCond:0.48,thermalExp:130,
+    composition:{}, desc:"Chemikalienbeständig, lebensmitteltauglich. Kanister, Rohre, Schneidbretter." },
+  { id:26, name:"PMMA (Acrylglas)",  category:"Kunststoff", sub:"Standard-Kunststoff",
+    tensile:73,   yield:65,   elongation:3,  hardness:85,  hardnessUnit:"Shore D",
+    density:1.19, modulus:3.3, tempMax:90,   tempMin:-40,  thermalCond:0.19,thermalExp:70,
+    composition:{}, desc:"Transparenter Kunststoff mit UV-Beständigkeit und hoher optischer Klarheit. Glasersatz, Lichtleiter." },
+  { id:27, name:"PVC hart",          category:"Kunststoff", sub:"Standard-Kunststoff",
+    tensile:55,   yield:50,   elongation:20, hardness:78,  hardnessUnit:"Shore D",
+    density:1.40, modulus:3.0, tempMax:65,   tempMin:-10,  thermalCond:0.19,thermalExp:70,
+    composition:{}, desc:"Häufig verwendeter Kunststoff für Rohre, Fensterprofile und Kabelisolierungen." },
+  { id:28, name:"PP (Polypropylen)", category:"Kunststoff", sub:"Standard-Kunststoff",
+    tensile:35,   yield:30,   elongation:150,hardness:65,  hardnessUnit:"Shore D",
+    density:0.91, modulus:1.5, tempMax:100,  tempMin:-20,  thermalCond:0.22,thermalExp:150,
+    composition:{}, desc:"Leichter, chemikalienbeständiger Allzweckkunststoff. Verpackungen, Automobilindustrie." },
+  { id:29, name:"PLA",              category:"3D-Druck", sub:"FDM Standard",
+    tensile:50,   yield:45,   elongation:6,  hardness:83,  hardnessUnit:"Shore D",
+    density:1.24, modulus:3.5, tempMax:60,   tempMin:-20,  thermalCond:0.13,thermalExp:68,
+    composition:{}, printTemp:200, bedTemp:60,
+    desc:"Biologisch abbaubares Standardfilament. Einfach zu drucken, geringes Warping. Ideal für Prototypen." },
+  { id:30, name:"PETG",             category:"3D-Druck", sub:"FDM Standard",
+    tensile:53,   yield:42,   elongation:50, hardness:76,  hardnessUnit:"Shore D",
+    density:1.27, modulus:2.2, tempMax:80,   tempMin:-30,  thermalCond:0.29,thermalExp:60,
+    composition:{}, printTemp:235, bedTemp:80,
+    desc:"Kombiniert gute Eigenschaften von PLA und ABS. Lebensmittelsicher, feuchtigkeitsbeständig." },
+  { id:31, name:"TPU 95A",          category:"3D-Druck", sub:"FDM Flexibel",
+    tensile:35,   yield:20,   elongation:580,hardness:95,  hardnessUnit:"Shore A",
+    density:1.21, modulus:0.05,tempMax:80,   tempMin:-40,  thermalCond:0.19,thermalExp:100,
+    composition:{}, printTemp:220, bedTemp:30,
+    desc:"Flexibles Filament mit guter Elastizität und Abriebfestigkeit. Dichtungen, Griffe, Schutzhüllen." },
+  { id:32, name:"ASA",              category:"3D-Druck", sub:"FDM Standard",
+    tensile:45,   yield:40,   elongation:30, hardness:75,  hardnessUnit:"Shore D",
+    density:1.07, modulus:2.2, tempMax:95,   tempMin:-30,  thermalCond:0.17,thermalExp:98,
+    composition:{}, printTemp:245, bedTemp:100,
+    desc:"UV-beständige Alternative zu ABS. Witterungsbeständig für Outdoor-Anwendungen." },
+  { id:33, name:"Nylon PA12 (3D)", category:"3D-Druck", sub:"FDM Technisch",
+    tensile:48,   yield:43,   elongation:50, hardness:72,  hardnessUnit:"Shore D",
+    density:1.01, modulus:1.8, tempMax:100,  tempMin:-40,  thermalCond:0.20,thermalExp:100,
+    composition:{}, printTemp:255, bedTemp:70,
+    desc:"Technisches Filament mit guter Schlagzähigkeit und Chemikalienbeständigkeit. Vor dem Druck trocknen!" },
+  { id:34, name:"CF-PLA (Carbon)", category:"3D-Druck", sub:"FDM Verbundwerkstoff",
+    tensile:65,   yield:58,   elongation:2,  hardness:90,  hardnessUnit:"Shore D",
+    density:1.30, modulus:8.5, tempMax:65,   tempMin:-20,  thermalCond:0.20,thermalExp:40,
+    composition:{}, printTemp:215, bedTemp:60,
+    desc:"PLA mit Kurzkohlefasern verstärkt. Deutlich höhere Steifigkeit. Gehärtete Düse erforderlich." },
+  { id:35, name:"PEEK (3D-Druck)", category:"3D-Druck", sub:"FDM Hochleistung",
+    tensile:95,   yield:88,   elongation:40, hardness:84,  hardnessUnit:"Shore D",
+    density:1.31, modulus:4.1, tempMax:240,  tempMin:-65,  thermalCond:0.25,thermalExp:50,
+    composition:{}, printTemp:400, bedTemp:120,
+    desc:"3D-Druck PEEK. Hochtemperatur-Drucker >350 °C erforderlich. Medizin, Luft- und Raumfahrt." },
+  { id:36, name:"Resin Standard",  category:"3D-Druck", sub:"SLA/MSLA",
+    tensile:38,   yield:32,   elongation:8,  hardness:83,  hardnessUnit:"Shore D",
+    density:1.10, modulus:2.8, tempMax:45,   tempMin:-10,  thermalCond:0.21,thermalExp:85,
+    composition:{}, printTemp:null, bedTemp:null,
+    desc:"Standard-Photopolymerharz für hohe Detailauflösung. Modelle, Schmuck, Zahntechnik." },
+  { id:37, name:"ABS-Resin",       category:"3D-Druck", sub:"SLA/MSLA",
+    tensile:55,   yield:48,   elongation:25, hardness:80,  hardnessUnit:"Shore D",
+    density:1.18, modulus:2.5, tempMax:55,   tempMin:-10,  thermalCond:0.22,thermalExp:80,
+    composition:{}, printTemp:null, bedTemp:null,
+    desc:"Photopolymerharz mit ABS-ähnlichen Eigenschaften. Höhere Schlagzähigkeit als Standardharz." },
+  { id:38, name:"316L Metallfilament", category:"3D-Druck", sub:"FDM Metall",
+    tensile:485,  yield:170,  elongation:40, hardness:79,  hardnessUnit:"HRB",
+    density:7.98, modulus:193, tempMax:870,  tempMin:-196, thermalCond:15,  thermalExp:16.0,
+    composition:{Fe:65.00,Cr:17.00,Ni:12.00,Mo:2.50}, printTemp:250, bedTemp:60,
+    desc:"Edelstahlfilament (MIM). Nach Druck: Entbindern und Sintern nötig. ca. 20% Schrumpfung." },
+  { id:39, name:"Wood PLA (Holz)", category:"3D-Druck", sub:"FDM Verbundwerkstoff",
+    tensile:35,   yield:30,   elongation:3,  hardness:75,  hardnessUnit:"Shore D",
+    density:1.15, modulus:3.0, tempMax:55,   tempMin:-20,  thermalCond:0.14,thermalExp:70,
+    composition:{}, printTemp:210, bedTemp:45,
+    desc:"PLA mit ca. 30% Holzpartikeln. Holzähnliche Optik, Haptik und Geruch. Schleif- und beizbar." },
+];
 
-<div class="grid">
-  <input id="nenn" type="number" value="20" placeholder="Nennmaß [mm]">
-
-  <select id="holeLetter">
-    <option>A</option><option>B</option><option>C</option><option>D</option>
-    <option>E</option><option>F</option><option>G</option>
-    <option selected>H</option><option>JS</option>
-    <option>K</option><option>M</option><option>N</option><option>P</option>
-  </select>
-
-  <select id="holeIT">
-    <option>5</option><option>6</option><option selected>7</option>
-    <option>8</option><option>9</option><option>10</option>
-  </select>
-
-  <select id="shaftLetter">
-    <option>a</option><option>b</option><option>c</option><option>d</option>
-    <option>e</option><option>f</option><option>g</option>
-    <option selected>h</option><option>js</option>
-    <option>k</option><option>m</option><option>n</option><option>p</option>
-  </select>
-
-  <select id="shaftIT">
-    <option>5</option><option selected>6</option>
-    <option>7</option><option>8</option><option>9</option>
-  </select>
-</div>
-
-<button onclick="calcISO()">Berechnen</button>
-
-<div id="out" class="result"></div>
-
-<div class="graph" id="graph">
-  <div class="zero-line"></div>
-
-  <div id="boreBar" class="bar bore">
-    <span id="boreTxt"></span>
-  </div>
-
-  <div id="shaftBar" class="bar shaft">
-    <span id="shaftTxt"></span>
-  </div>
-</div>
-</div>
-
-<!-- ================= ISO‑2768 ================= -->
-<div class="card">
-<h2>Allgemeintoleranz ISO 2768</h2>
-
-<div class="grid">
-  <input id="gN" type="number" placeholder="Nennmaß [mm]">
-  <select id="gK">
-    <option value="f">fein</option>
-    <option value="m" selected>mittel</option>
-    <option value="c">grob</option>
-    <option value="v">sehr grob</option>
-  </select>
-</div>
-
-<button onclick="calcISO2768()">Berechnen</button>
-<div id="out2768" class="result"></div>
-</div>
-
-<script>
-/* ===== IT‑Grundtoleranzen (µm, Auszug) ===== */
-const IT_TABLE={
-  5:16, 6:22, 7:35, 8:54, 9:87, 10:140
+const CAT = {
+  "Stahl":     { bg:"rgba(180,83,9,0.13)",   border:"#b45309", text:"#f59e0b", dot:"#f59e0b" },
+  "Metall":    { bg:"rgba(3,105,161,0.13)",  border:"#0369a1", text:"#38bdf8", dot:"#38bdf8" },
+  "Kunststoff":{ bg:"rgba(21,128,61,0.13)",  border:"#15803d", text:"#4ade80", dot:"#4ade80" },
+  "3D-Druck":  { bg:"rgba(124,58,237,0.13)", border:"#7c3aed", text:"#a78bfa", dot:"#a78bfa" },
 };
+const PROP_KEYS   = ["tensile","yield","elongation","density","modulus","tempMax","tempMin","thermalCond","thermalExp"];
+const PROP_LABELS = { tensile:"Zugfestigkeit", yield:"Streckgrenze", elongation:"Bruchdehnung",
+  density:"Dichte", modulus:"E-Modul", tempMax:"Temp. max", tempMin:"Temp. min",
+  thermalCond:"Wärmeleitf.", thermalExp:"Wärmeausdehnung" };
+const PROP_UNITS  = { tensile:"MPa", yield:"MPa", elongation:"%", density:"kg/dm³",
+  modulus:"GPa", tempMax:"°C", tempMin:"°C", thermalCond:"W/mK", thermalExp:"µm/mK" };
 
-/* ===== Grundabmaße (vereinfachte Normlogik) ===== */
-const HOLE_BASE={A:60,B:40,C:25,D:16,E:10,F:6,G:2,H:0,JS:-5,K:-2,M:-6,N:-10,P:-16};
-const SHAFT_BASE={a:-60,b:-40,c:-25,d:-16,e:-10,f:-6,g:-2,h:0,js:-5,k:2,m:6,n:10,p:16};
-
-function calcISO(){
-  const d=+nenn.value;
-
-  const T_hole = IT_TABLE[holeIT.value] / 1000;
-  const T_shaft = IT_TABLE[shaftIT.value] / 1000;
-
-  const EB = (HOLE_BASE[holeLetter.value]||0)/1000;
-  const ES = (SHAFT_BASE[shaftLetter.value]||0)/1000;
-
-  const boreMin = d + EB;
-  const boreMax = boreMin + T_hole;
-
-  const shaftMax = d + ES;
-  const shaftMin = shaftMax - T_shaft;
-
-  const minSpiel = boreMin - shaftMax;
-  const maxSpiel = boreMax - shaftMin;
-
-  let type="<span class='mid'>Übergangspassung</span>";
-  if(minSpiel>0) type="<span class='good'>Spielpassung</span>";
-  if(maxSpiel<0) type="<span class='bad'>Übermaßpassung</span>";
-
-  out.innerHTML=`
-<b>Bohrung:</b> ${boreMin.toFixed(3)} … ${boreMax.toFixed(3)} mm<br>
-<b>Welle:</b> ${shaftMin.toFixed(3)} … ${shaftMax.toFixed(3)} mm<br><br>
-<b>Passung:</b> ${type}
-`;
-
-  const refMin=Math.min(boreMin,shaftMin);
-  const refMax=Math.max(boreMax,shaftMax);
-  const span=refMax-refMin;
-  const usable=graph.clientWidth-280;
-  const scale=usable/span;
-
-  const boreLeft=(boreMin-refMin)*scale+140;
-  const shaftLeft=(shaftMin-refMin)*scale+140;
-
-  boreBar.style.left=boreLeft+"px";
-  boreBar.style.width=T_hole*scale+"px";
-  shaftBar.style.left=shaftLeft+"px";
-  shaftBar.style.width=T_shaft*scale+"px";
-
-  boreTxt.textContent=`${holeLetter.value}${holeIT.value}`;
-  shaftTxt.textContent=`${shaftLetter.value}${shaftIT.value}`;
+function useWindowWidth() {
+  const [w, setW] = useState(window.innerWidth);
+  useEffect(() => {
+    const h = () => setW(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return w;
 }
 
-/* ===== ISO‑2768 ===== */
-function calcISO2768(){
-  const d0=+gN.value;
-  const tbl={
-    f:[[6,0.05],[30,0.1],[120,0.15],[1e9,0.3]],
-    m:[[6,0.1],[30,0.2],[120,0.3],[1e9,0.8]],
-    c:[[6,0.2],[30,0.5],[120,0.8],[1e9,2]],
-    v:[[6,0.5],[30,1],[120,1.5],[1e9,4]]
-  }[gK.value];
-
-  let t=0;
-  for(const [l,v] of tbl){ if(d0<=l){t=v;break;} }
-  out2768.innerHTML=`<b>${(d0-t).toFixed(2)} … ${(d0+t).toFixed(2)} mm</b>`;
+function Bar({ value, max, color }) {
+  return (
+    <div style={{background:"#1c1c1c",borderRadius:2,height:3,overflow:"hidden",marginTop:3}}>
+      <div style={{width:`${Math.min(100,(value/max)*100)}%`,height:"100%",background:color,borderRadius:2}} />
+    </div>
+  );
 }
+function Tag({ children, cat }) {
+  const c = CAT[cat]||CAT["Stahl"];
+  return <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:c.bg,
+    color:c.text,border:`1px solid ${c.border}55`,letterSpacing:"0.05em",fontWeight:700,whiteSpace:"nowrap"}}>{children}</span>;
+}
+function NumInput({ value, onChange }) {
+  return (
+    <input type="number" value={value} onChange={e=>onChange(Number(e.target.value))}
+      style={{width:"100%",background:"#111",border:"1px solid #252525",color:"#ddd",
+        padding:"6px 8px",borderRadius:5,fontSize:12,fontFamily:"monospace"}} />
+  );
+}
+function RangeRow({ label, unit, lo, hi, onLo, onHi }) {
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+        <span style={{fontSize:10,color:"#666",textTransform:"uppercase",letterSpacing:"0.07em"}}>{label}</span>
+        <span style={{fontSize:10,color:"#f59e0b",fontFamily:"monospace"}}>{lo} – {hi} {unit}</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+        <NumInput value={lo} onChange={v=>onLo(Math.min(v,hi))} />
+        <NumInput value={hi} onChange={v=>onHi(Math.max(v,lo))} />
+      </div>
+    </div>
+  );
+}
+
+function MaterialCard({ mat, onClick, isMobile }) {
+  const c = CAT[mat.category]||CAT["Stahl"];
+  const [hov, setHov] = useState(false);
+  return (
+    <div onClick={()=>onClick(mat)} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:hov?c.bg:"#0d0d0d",border:`1px solid ${hov?c.border+"aa":c.border+"2a"}`,
+        borderRadius:10,padding:isMobile?"13px":"15px 17px",cursor:"pointer",transition:"all 0.18s"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:isMobile?13:14,fontWeight:700,color:"#f0f0f0",
+            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mat.name}</div>
+          <div style={{fontSize:10,color:"#555",marginTop:1}}>{mat.sub}</div>
+        </div>
+        <Tag cat={mat.category}>{mat.category}</Tag>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px"}}>
+        {[["tensile",2100],["yield",2100],["tempMax",1100],["density",20]].map(([k,mx])=>(
+          <div key={k}>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:10,color:"#555"}}>{PROP_LABELS[k]}</span>
+              <span style={{fontSize:10,color:"#bbb",fontFamily:"monospace"}}>{mat[k]} {PROP_UNITS[k]}</span>
+            </div>
+            <Bar value={mat[k]} max={mx} color={c.text} />
+          </div>
+        ))}
+      </div>
+      {mat.printTemp && (
+        <div style={{marginTop:9,display:"flex",flexWrap:"wrap",gap:5}}>
+          <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:"rgba(124,58,237,0.1)",
+            color:"#a78bfa",border:"1px solid #7c3aed33"}}>?? {mat.printTemp} °C Düse</span>
+          {mat.bedTemp>0 && <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,
+            background:"rgba(124,58,237,0.1)",color:"#a78bfa",border:"1px solid #7c3aed33"}}>
+            ?? {mat.bedTemp} °C Bett</span>}
+        </div>
+      )}
+      {mat.category==="3D-Druck" && mat.printTemp===null && (
+        <div style={{marginTop:9}}>
+          <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:"rgba(124,58,237,0.1)",
+            color:"#8b6fb5",border:"1px solid #7c3aed22"}}>Pulver / Harz-Verfahren</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailModal({ mat, onClose, isMobile }) {
+  useEffect(()=>{
+    if(!mat) return;
+    document.body.style.overflow="hidden";
+    return ()=>{ document.body.style.overflow=""; };
+  },[mat]);
+  if(!mat) return null;
+  const c = CAT[mat.category]||CAT["Stahl"];
+  const comp = Object.entries(mat.composition||{});
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,
+      display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",
+      padding:isMobile?0:20,backdropFilter:"blur(4px)"}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{background:"#0d0d0d",border:`1px solid ${c.border}55`,
+          borderRadius:isMobile?"16px 16px 0 0":12,width:"100%",maxWidth:isMobile?"100%":660,
+          maxHeight:isMobile?"90vh":"87vh",overflowY:"auto",
+          padding:isMobile?"24px 18px 36px":"28px"}}>
+        {isMobile && <div style={{width:36,height:4,background:"#2a2a2a",borderRadius:2,margin:"0 auto 20px"}} />}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:12}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:isMobile?20:22,fontWeight:800,color:"#f0f0f0",letterSpacing:"-0.02em"}}>{mat.name}</div>
+            <div style={{fontSize:12,color:c.text,marginTop:3}}>{mat.category} · {mat.sub}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"1px solid #2a2a2a",color:"#666",
+            borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12,flexShrink:0}}>?</button>
+        </div>
+        <p style={{fontSize:13,color:"#777",lineHeight:1.65,marginBottom:20}}>{mat.desc}</p>
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:8,marginBottom:18}}>
+          {[...PROP_KEYS,"hardness"].map(k=>{
+            const isHard = k==="hardness";
+            return (
+              <div key={k} style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:7,padding:"10px 12px"}}>
+                <div style={{fontSize:9,color:"#3a3a3a",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                  {isHard?"Härte":PROP_LABELS[k]}</div>
+                <div style={{fontSize:16,fontWeight:700,color:c.text,fontFamily:"monospace"}}>
+                  {isHard?mat.hardness:mat[k]}</div>
+                <div style={{fontSize:9,color:"#2e2e2e"}}>{isHard?mat.hardnessUnit:PROP_UNITS[k]}</div>
+              </div>
+            );
+          })}
+        </div>
+        {comp.length>0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:10,color:"#3a3a3a",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>Zusammensetzung</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {comp.map(([el,pct])=>(
+                <div key={el} style={{background:c.bg,border:`1px solid ${c.border}44`,borderRadius:7,
+                  padding:"7px 12px",display:"flex",flexDirection:"column",alignItems:"center",minWidth:52}}>
+                  <span style={{fontSize:14,fontWeight:800,color:c.text}}>{el}</span>
+                  <span style={{fontSize:11,color:"#555",fontFamily:"monospace"}}>{pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {mat.category==="3D-Druck" && (
+          <div style={{background:"rgba(124,58,237,0.07)",border:"1px solid #7c3aed33",borderRadius:8,padding:"14px 16px"}}>
+            <div style={{fontSize:10,color:"#7c3aed",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>3D-Druck Parameter</div>
+            {mat.printTemp ? (
+              <div style={{display:"flex",gap:24}}>
+                <div>
+                  <div style={{fontSize:10,color:"#555"}}>Düsentemperatur</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"#a78bfa",fontFamily:"monospace"}}>{mat.printTemp} °C</div>
+                </div>
+                {mat.bedTemp>0 && <div>
+                  <div style={{fontSize:10,color:"#555"}}>Betttemperatur</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"#a78bfa",fontFamily:"monospace"}}>{mat.bedTemp} °C</div>
+                </div>}
+              </div>
+            ) : (
+              <div style={{fontSize:13,color:"#666"}}>Pulver- oder Harzbasiertes Verfahren (SLS / SLA / MSLA / LPBF).</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FilterPanel({ state, dispatch, count, total, isMobile, onClose }) {
+  const { tensile, yield:yld, tempMax, tempMin, density, comp, search, cat } = state;
+  const cats = ["Alle","Stahl","Metall","Kunststoff","3D-Druck"];
+  return (
+    <div style={{padding:isMobile?"0 16px 24px":"18px 16px",overflowY:"auto",height:isMobile?"auto":"100%"}}>
+      {isMobile
+        ? <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <span style={{fontSize:14,fontWeight:700,color:"#e0e0e0"}}>Filter</span>
+            <button onClick={onClose} style={{background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#888",
+              borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12}}>Fertig</button>
+          </div>
+        : <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <span style={{fontSize:11,letterSpacing:"0.12em",color:"#444",textTransform:"uppercase",fontWeight:700}}>Filter</span>
+            <button onClick={()=>dispatch({type:"reset"})} style={{fontSize:10,color:"#f59e0b",background:"none",border:"none",cursor:"pointer"}}>? Reset</button>
+          </div>
+      }
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Suche</div>
+        <input value={search} onChange={e=>dispatch({type:"search",v:e.target.value})}
+          placeholder="Werkstoff suchen…"
+          style={{width:"100%",background:"#111",border:"1px solid #252525",color:"#ddd",
+            padding:"8px 10px",borderRadius:6,fontSize:13,fontFamily:"inherit"}} />
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:7}}>Kategorie</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {cats.map(c=>{
+            const col=CAT[c]; const active=cat===c;
+            return <button key={c} onClick={()=>dispatch({type:"cat",v:c})}
+              style={{padding:"5px 11px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",
+                background:active?(col?.bg||"#1a1a1a"):"transparent",
+                border:active?`1px solid ${col?.border||"#f59e0b"}66`:"1px solid #1e1e1e",
+                color:active?(col?.text||"#f59e0b"):"#555"}}>{c}</button>;
+          })}
+        </div>
+      </div>
+      <div style={{borderTop:"1px solid #181818",paddingTop:13}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:11}}>Mechanik</div>
+        <RangeRow label="Zugfestigkeit" unit="MPa" lo={tensile[0]} hi={tensile[1]}
+          onLo={v=>dispatch({type:"tensile",v:[v,tensile[1]]})} onHi={v=>dispatch({type:"tensile",v:[tensile[0],v]})} />
+        <RangeRow label="Streckgrenze" unit="MPa" lo={yld[0]} hi={yld[1]}
+          onLo={v=>dispatch({type:"yield",v:[v,yld[1]]})} onHi={v=>dispatch({type:"yield",v:[yld[0],v]})} />
+      </div>
+      <div style={{borderTop:"1px solid #181818",paddingTop:13,marginTop:4}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:11}}>Temperatur</div>
+        <RangeRow label="Temp. max" unit="°C" lo={tempMax[0]} hi={tempMax[1]}
+          onLo={v=>dispatch({type:"tempMax",v:[v,tempMax[1]]})} onHi={v=>dispatch({type:"tempMax",v:[tempMax[0],v]})} />
+        <RangeRow label="Temp. min" unit="°C" lo={tempMin[0]} hi={tempMin[1]}
+          onLo={v=>dispatch({type:"tempMin",v:[v,tempMin[1]]})} onHi={v=>dispatch({type:"tempMin",v:[tempMin[0],v]})} />
+      </div>
+      <div style={{borderTop:"1px solid #181818",paddingTop:13,marginTop:4}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:11}}>Physikalisch</div>
+        <RangeRow label="Dichte" unit="kg/dm³" lo={density[0]} hi={density[1]}
+          onLo={v=>dispatch({type:"density",v:[v,density[1]]})} onHi={v=>dispatch({type:"density",v:[density[0],v]})} />
+      </div>
+      <div style={{borderTop:"1px solid #181818",paddingTop:13,marginTop:4}}>
+        <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:7}}>Bestandteil (Element)</div>
+        <input value={comp} onChange={e=>dispatch({type:"comp",v:e.target.value})}
+          placeholder="z. B. Cr, Mo, V, Ni …"
+          style={{width:"100%",background:"#111",border:"1px solid #252525",color:"#ddd",
+            padding:"8px 10px",borderRadius:6,fontSize:13,fontFamily:"inherit"}} />
+      </div>
+      <div style={{borderTop:"1px solid #181818",paddingTop:13,marginTop:14,textAlign:"center"}}>
+        <span style={{fontSize:12,color:"#333"}}><span style={{color:"#f59e0b",fontWeight:700}}>{count}</span> / {total} Werkstoffe</span>
+      </div>
+      {isMobile && <button onClick={()=>dispatch({type:"reset"})}
+        style={{marginTop:12,width:"100%",padding:"11px",background:"#111",
+          border:"1px solid #252525",color:"#f59e0b",borderRadius:8,cursor:"pointer",
+          fontSize:13,fontWeight:600}}>? Filter zurücksetzen</button>}
+    </div>
+  );
+}
+
+const INIT = {
+  tensile:[0,2100], yield:[0,2100], tempMax:[-200,1100], tempMin:[-210,300],
+  density:[0.8,20], comp:"", search:"", cat:"Alle"
+};
+function reducer(s, a) {
+  if(a.type==="reset") return {...INIT};
+  return {...s, [a.type]:a.v};
+}
+
+function App() {
+  const width = useWindowWidth();
+  const isMobile = width < 768;
+  const isTablet = width < 1100;
+  const [state, dispatch] = React.useReducer(reducer, INIT);
+  const [selected, setSelected] = useState(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const filtered = useMemo(()=>MATERIALS.filter(m=>{
+    if(state.cat!=="Alle" && m.category!==state.cat) return false;
+    const q=state.search.toLowerCase();
+    if(q && !m.name.toLowerCase().includes(q) && !m.sub.toLowerCase().includes(q)) return false;
+    if(m.tensile<state.tensile[0]||m.tensile>state.tensile[1]) return false;
+    if(m.yield<state.yield[0]||m.yield>state.yield[1]) return false;
+    if(m.tempMax<state.tempMax[0]||m.tempMax>state.tempMax[1]) return false;
+    if(m.tempMin<state.tempMin[0]||m.tempMin>state.tempMin[1]) return false;
+    if(m.density<state.density[0]||m.density>state.density[1]) return false;
+    if(state.comp.trim()){
+      const el=state.comp.trim().toUpperCase();
+      if(!Object.keys(m.composition||{}).map(k=>k.toUpperCase()).includes(el)) return false;
+    }
+    return true;
+  }),[state]);
+
+  const cols = isMobile ? 1 : isTablet ? 2 : 3;
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:"#080808"}}>
+      <header style={{background:"#0a0a0a",borderBottom:"1px solid #141414",
+        padding:isMobile?"11px 14px":"13px 22px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        position:"sticky",top:0,zIndex:200,gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+          <div style={{width:30,height:30,borderRadius:7,flexShrink:0,
+            background:"linear-gradient(135deg,#f59e0b,#92400e)",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>?</div>
+          <div>
+            <div style={{fontSize:isMobile?14:16,fontWeight:800,letterSpacing:"-0.02em",color:"#f0f0f0",lineHeight:1}}>
+              WERKSTOFF<span style={{color:"#f59e0b"}}>DB</span></div>
+            {!isMobile && <div style={{fontSize:10,color:"#333",letterSpacing:"0.1em",textTransform:"uppercase"}}>
+              {MATERIALS.length} Werkstoffe · Techn. Datenbank</div>}
+          </div>
+        </div>
+        {!isMobile && (
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {["Alle","Stahl","Metall","Kunststoff","3D-Druck"].map(c=>{
+              const col=CAT[c]; const active=state.cat===c;
+              return <button key={c} onClick={()=>dispatch({type:"cat",v:c})}
+                style={{padding:"5px 13px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",
+                  background:active?(col?.bg||"#1a1a1a"):"transparent",
+                  border:active?`1px solid ${col?.border||"#f59e0b"}66`:"1px solid #1e1e1e",
+                  color:active?(col?.text||"#f59e0b"):"#555",transition:"all 0.15s"}}>{c}</button>;
+            })}
+          </div>
+        )}
+        {isMobile && (
+          <button onClick={()=>setFilterOpen(true)}
+            style={{background:"#111",border:"1px solid #252525",color:"#ccc",
+              borderRadius:8,padding:"8px 13px",cursor:"pointer",fontSize:13,
+              display:"flex",alignItems:"center",gap:6,fontWeight:600}}>
+            ? Filter
+            {(state.comp||state.search||state.cat!=="Alle")&&
+              <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b"}} />}
+          </button>
+        )}
+      </header>
+
+      {isMobile && (
+        <div style={{background:"#0a0a0a",borderBottom:"1px solid #141414",
+          padding:"9px 14px",display:"flex",gap:6,overflowX:"auto",
+          WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+          {["Alle","Stahl","Metall","Kunststoff","3D-Druck"].map(c=>{
+            const col=CAT[c]; const active=state.cat===c;
+            return <button key={c} onClick={()=>dispatch({type:"cat",v:c})}
+              style={{padding:"6px 13px",borderRadius:20,fontSize:12,fontWeight:600,
+                cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",
+                background:active?(col?.bg||"#1a1a1a"):"#111",
+                border:active?`1px solid ${col?.border||"#f59e0b"}66`:"1px solid #1e1e1e",
+                color:active?(col?.text||"#f59e0b"):"#555"}}>{c}</button>;
+          })}
+        </div>
+      )}
+
+      <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0}}>
+        {!isMobile && (
+          <aside style={{width:242,background:"#0a0a0a",borderRight:"1px solid #141414",
+            flexShrink:0,overflowY:"auto",height:"calc(100vh - 57px)",position:"sticky",top:57}}>
+            <FilterPanel state={state} dispatch={dispatch} count={filtered.length}
+              total={MATERIALS.length} isMobile={false} />
+          </aside>
+        )}
+        <main style={{flex:1,overflowY:"auto",padding:isMobile?"12px":"20px 22px"}}>
+          {isMobile && (
+            <div style={{marginBottom:12}}>
+              <input value={state.search} onChange={e=>dispatch({type:"search",v:e.target.value})}
+                placeholder="??  Werkstoff suchen…"
+                style={{width:"100%",background:"#111",border:"1px solid #252525",color:"#ddd",
+                  padding:"10px 14px",borderRadius:8,fontSize:14,fontFamily:"inherit"}} />
+            </div>
+          )}
+          <div style={{marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:12,color:"#3a3a3a"}}>
+              <span style={{color:"#f59e0b",fontWeight:700}}>{filtered.length}</span> Ergebnisse
+            </span>
+          </div>
+          {filtered.length===0
+            ? <div style={{textAlign:"center",padding:"80px 20px",color:"#2a2a2a"}}>
+                <div style={{fontSize:36,marginBottom:12}}>??</div>
+                <div style={{fontSize:16,marginBottom:8,color:"#444"}}>Keine Werkstoffe gefunden</div>
+                <button onClick={()=>dispatch({type:"reset"})}
+                  style={{color:"#f59e0b",background:"none",border:"none",cursor:"pointer",fontSize:13}}>
+                  ? Filter zurücksetzen</button>
+              </div>
+            : <div style={{display:"grid",gridTemplateColumns:`repeat(${cols},1fr)`,gap:isMobile?9:12}}>
+                {filtered.map(m=><MaterialCard key={m.id} mat={m} onClick={setSelected} isMobile={isMobile} />)}
+              </div>
+          }
+          <div style={{height:20}} />
+        </main>
+      </div>
+
+      {isMobile && filterOpen && (
+        <div onClick={()=>setFilterOpen(false)} style={{position:"fixed",inset:0,
+          background:"rgba(0,0,0,0.8)",zIndex:500,display:"flex",flexDirection:"column",
+          justifyContent:"flex-end",backdropFilter:"blur(3px)"}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"#0e0e0e",borderRadius:"18px 18px 0 0",border:"1px solid #1e1e1e",
+              maxHeight:"88vh",overflowY:"auto",padding:"0 0 8px"}}>
+            <div style={{width:36,height:4,background:"#282828",borderRadius:2,margin:"14px auto 0"}} />
+            <FilterPanel state={state} dispatch={dispatch} count={filtered.length}
+              total={MATERIALS.length} isMobile={true} onClose={()=>setFilterOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      <DetailModal mat={selected} onClose={()=>setSelected(null)} isMobile={isMobile} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-
 </body>
 </html>
